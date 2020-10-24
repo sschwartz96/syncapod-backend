@@ -120,3 +120,20 @@ func (a *AuthStorePG) DeleteSession(ctx context.Context, id uuid.UUID) error {
 	}
 	return nil
 }
+
+func (a *AuthStorePG) GetSessionAndUser(ctx context.Context, sessionID uuid.UUID) (*SessionRow, *UserRow, error) {
+	s := &SessionRow{}
+	u := &UserRow{}
+	result := a.db.QueryRow(ctx,
+		"SELECT * FROM sessions s JOIN users u ON s.user_id=u.id WHERE s.id=$1",
+		sessionID,
+	)
+	err := result.Scan(
+		&s.ID, &s.UserID, &s.LoginTime, &s.LastSeenTime, &s.Expires, &s.UserAgent,
+		&u.ID, &u.Email, &u.Username, &u.Birthdate, &u.PasswordHash,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("GetSessionAndUser() error: %v", err)
+	}
+	return s, u, nil
+}

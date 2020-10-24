@@ -518,6 +518,61 @@ func TestAuthStorePG_DeleteSession(t *testing.T) {
 	}
 }
 
+func TestAuthStorePG_GetSessionAndUser(t *testing.T) {
+	type fields struct {
+		db *pgxpool.Pool
+	}
+	type args struct {
+		ctx       context.Context
+		sessionID uuid.UUID
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *SessionRow
+		want1   *UserRow
+		wantErr bool
+	}{
+		{
+			name: "valid",
+			args: args{
+				ctx:       context.Background(),
+				sessionID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d87ae20c8ba")},
+			fields: fields{db: db},
+			want: &SessionRow{
+				ID:           uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d87ae20c8ba"),
+				UserID:       uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"),
+				Expires:      time.Unix(1000, 0),
+				LastSeenTime: time.Unix(1000, 0),
+				LoginTime:    time.Unix(1000, 0),
+				UserAgent:    "testAgent"},
+			want1: &UserRow{ID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"),
+				Email: "get@test.test", Username: "get",
+				Birthdate: time.Unix(0, 0).UTC(), PasswordHash: []byte("pass")},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &AuthStorePG{
+				db: tt.fields.db,
+			}
+			got, got1, err := a.GetSessionAndUser(tt.args.ctx, tt.args.sessionID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("AuthStorePG.GetSessionAndUser() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("AuthStorePG.GetSessionAndUser() got =\n%v, want \n%v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("AuthStorePG.GetSessionAndUser() got1 = \n%v, want \n%v", got1, tt.want1)
+			}
+		})
+	}
+}
+
 func migrateUp() {
 	// get all migration(up) files
 	files := getMigrateUpFiles()

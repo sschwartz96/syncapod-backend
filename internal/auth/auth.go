@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
+	"github.com/google/uuid"
 	"github.com/sschwartz96/syncapod-backend/internal/db"
-	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -20,9 +20,9 @@ type AuthController struct {
 
 type Auth interface {
 	// Syncapod
-	Login()
-	Authorize()
-	Logout()
+	Login(username, password string) (*db.UserRow, error)
+	Authorize(sessionID uuid.UUID) (*db.UserRow, error)
+	Logout(sessionID uuid.UUID) error
 
 	// OAuth
 	OAuthRequest() // initial req, sends back "grant" auth code
