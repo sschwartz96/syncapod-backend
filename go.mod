@@ -17,6 +17,8 @@ require (
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/ory/dockertest v3.3.5+incompatible
+	github.com/sschwartz96/stockpile v0.2.5
+	github.com/sschwartz96/syncapod v0.0.0-20201020230002-c2e9f3d3456a
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gotest.tools v2.2.0+incompatible // indirect
