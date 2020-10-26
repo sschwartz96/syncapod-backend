@@ -18,9 +18,10 @@ type Auth interface {
 	Logout(ctx context.Context, sessionID uuid.UUID) error
 	// OAuth
 	CreateAuthCode(ctx context.Context, userID uuid.UUID, clientID string) (*db.AuthCodeRow, error)
-
-	OAuthGrant() // accept granted auth code and return access token
-	OAuthToken() // read token and send back resource
+	CreateAccessToken(ctx context.Context, authCode *db.AuthCodeRow) (*db.AccessTokenRow, error)
+	ValidateAuthCode(ctx context.Context, code string) (*db.AuthCodeRow, error)
+	ValidateAccessToken(ctx context.Context, token string) (*db.UserRow, error)
+	ValidateRefreshToken(ctx context.Context, token string) (*db.AccessTokenRow, error)
 }
 
 type AuthController struct {

@@ -11,10 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sschwartz96/syncapod/internal/auth"
-	"github.com/sschwartz96/syncapod/internal/podcast"
-	"github.com/sschwartz96/syncapod/internal/protos"
-	"github.com/sschwartz96/syncapod/internal/user"
+	"github.com/sschwartz96/syncapod-backend/internal/auth"
 )
 
 // Alexa intents events and directives
@@ -38,8 +35,12 @@ const (
 	DirClearQueue = "AudioPlayer.ClearQueue"
 )
 
+type AlexaHandler struct {
+	auth auth.Auth
+}
+
 // Alexa handles all requests through /api/alexa endpoint
-func (h *APIHandler) Alexa(res http.ResponseWriter, req *http.Request) {
+func (h *AlexaHandler) Alexa(res http.ResponseWriter, req *http.Request) {
 	var resText, directive string
 
 	body, err := ioutil.ReadAll(req.Body)
@@ -236,7 +237,7 @@ func (h *APIHandler) Alexa(res http.ResponseWriter, req *http.Request) {
 
 // moveAudio takes pointer to aData and bool for direction
 // returns pointers to podcast and episode, response text and offset in millis
-func (h *APIHandler) moveAudio(aData *AlexaData, forward bool) (*protos.Podcast, *protos.Episode, string, int64) {
+func (h *AlexaHandler) moveAudio(aData *AlexaData, forward bool) (*protos.Podcast, *protos.Episode, string, int64) {
 	var pod *protos.Podcast
 	var epi *protos.Episode
 	var resText string
@@ -481,7 +482,7 @@ func getAccessToken(data *AlexaData) (string, error) {
 }
 
 // AudioEvent handles responses from the Alexa audioplayer
-func (h *APIHandler) AudioEvent(res http.ResponseWriter, req *http.Request, body []byte) {
+func (h *AlexaHandler) AudioEvent(res http.ResponseWriter, req *http.Request, body []byte) {
 	var data AudioData
 	err := json.Unmarshal(body, &data)
 	if err != nil {

@@ -14,7 +14,7 @@ import (
 
 // OauthHandler handles authorization and authentication to oauth clients
 type OauthHandler struct {
-	authController *auth.AuthController
+	authController auth.Auth
 	loginTemplate  *template.Template
 	authTemplate   *template.Template
 	// only used for alexa, need these in database if suppport more than one client
@@ -23,7 +23,7 @@ type OauthHandler struct {
 }
 
 // CreateOauthHandler just intantiates an OauthHandler
-func CreateOauthHandler(authController *auth.AuthController, clientID, clientSecret string) (*OauthHandler, error) {
+func CreateOauthHandler(authController auth.Auth, clientID, clientSecret string) (*OauthHandler, error) {
 	loginT, err := template.ParseFiles("templates/oauth/login.gohtml")
 	authT, err := template.ParseFiles("templates/oauth/auth.gohtml")
 	if err != nil {
@@ -41,51 +41,22 @@ func CreateOauthHandler(authController *auth.AuthController, clientID, clientSec
 
 func (h *OauthHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	// path: /oauth/*
-	if req.Method == http.MethodGet {
-		h.Get(res, req)
-	} else if req.Method == http.MethodPost {
-		h.Post(res, req)
-	}
-}
-
-// Get is the handler for /api/oauth
-func (h *OauthHandler) Get(res http.ResponseWriter, req *http.Request) {
 	var head string
-	var err error
-
 	head, req.URL.Path = ShiftPath(req.URL.Path)
-
-	// path: /oauth/*
 	switch head {
 	case "login":
-		err = h.loginTemplate.Execute(res, nil)
+		h.Login(res, req)
 	case "authorize":
-		key := strings.TrimSpace(req.URL.Query().Get("sesh_key"))
-		seshID, err := uuid.Parse(key)
-		if err != nil {
-			fmt.Println("invalid seshID: ", err)
-			http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
-		}
-		_, err = h.authController.Authorize(req.Context(), seshID)
-		if err != nil {
-			fmt.Println("couldn't not validate, redirecting to login page: ", err)
-			http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
-			return
-		}
-		err = h.authTemplate.Execute(res, nil)
-	}
-
-	if err != nil {
-		fmt.Println("error executing template: ", err)
+		h.Authorize(res, req)
+	case "token":
+		h.Token(res, req)
 	}
 }
 
 // Post hanldes all post request at the oauth endpoint
 func (h *OauthHandler) Post(res http.ResponseWriter, req *http.Request) {
 	var head string
-
 	head, req.URL.Path = ShiftPath(req.URL.Path)
-
 	// path: /oauth/*
 	switch head {
 	case "login":
@@ -133,6 +104,26 @@ func (h *OauthHandler) Login(res http.ResponseWriter, req *http.Request) {
 
 // Authorize takes a session(access) token and validates it and sents back user info
 func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
+	if req.Method == http.MethodGet {
+		//	key := strings.TrimSpace(req.URL.Query().Get("sesh_key"))
+		//	seshID, err := uuid.Parse(key)
+		//	if err != nil {
+		//		fmt.Println("invalid seshID: ", err)
+		//		http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
+		//	}
+		//	_, err = h.authController.Authorize(req.Context(), seshID)
+		//	if err != nil {
+		//		fmt.Println("couldn't not validate, redirecting to login page: ", err)
+		//		http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
+		//		return
+		//	}
+		err := h.authTemplate.Execute(res, nil)
+		if err != nil {
+			fmt.Println("OauthHandler.Authorize() error executing template: %v", err)
+		}
+		return
+	}
+
 	// get session key, validate and get user info
 	seshKey := strings.TrimSpace(req.URL.Query().Get("sesh_key"))
 	seshID, err := uuid.Parse(seshKey)
@@ -150,7 +141,7 @@ func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
 
 	// create auth code
 	clientID := strings.TrimSpace(req.URL.Query().Get("client_id"))
-	authCode, err := h.authController.CreateAuthorizationCode(req.Context(), user.ID, clientID)
+	authCode, err := h.authController.CreateAuthCode(req.Context(), user.ID, clientID)
 	if err != nil {
 		//TODO: handle this error properly
 		fmt.Printf("error creating oauth authorization code: %v\n", err)
@@ -185,36 +176,24 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 
 	// ^^^^^^^^^^ client is authenticated after above ^^^^^^^^^^
 	var queryCode string
-
 	// find grant type: refresh_token or authorization_code
 	grantType := req.FormValue("grant_type")
-
 	if strings.ToLower(grantType) == "refresh_token" {
 		refreshToken := req.FormValue("refresh_token")
-		var accessToken models.AccessToken
-		//err := h.dbClient.FindOne(database.ColAccessToken, &accessToken, &db.Filter{"refresh_token": refreshToken}, nil)
-		err := h.authController.ValidateAccessToken()
+		accessToken, err := h.authController.ValidateRefreshToken(req.Context(), refreshToken)
 		if err != nil {
 			fmt.Println("couldn't find token based on refresh: ", err)
 			http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
 			//TODO: fail gracefully??
 			return
 		}
-		queryCode = accessToken.AuthCode
-
-		// delete the token
-		go func() {
-			//err := h.dbClient.Delete(database.ColAccessToken, &db.Filter{"token": accessToken.Token})
-			if err != nil {
-				fmt.Println("error oauth handler(Token):", err)
-			}
-		}()
+		queryCode = auth.EncodeKey(accessToken.AuthCode)
 	} else {
 		queryCode = req.FormValue("code")
 	}
 
 	// validate auth code
-	//authCode, err := auth.ValidateAuthCode(h.dbClient, queryCode)
+	authCode, err := h.authController.ValidateAuthCode(req.Context(), queryCode)
 	if err != nil {
 		fmt.Println("couldn't find auth code: ", err)
 		http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
@@ -223,7 +202,7 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// create access token
-	//token, err := auth.CreateAccessToken(h.dbClient, authCode)
+	token, err := h.authController.CreateAccessToken(req.Context(), authCode)
 	if err != nil {
 		fmt.Println("error oauth handler(Token), could not create access token:", err)
 		// TODO: send error message back
@@ -238,8 +217,8 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 		ExpiresIn    int    `json:"expires_in"`
 	}
 	tRes := &tokenResponse{
-		AccessToken:  token.Token,
-		RefreshToken: token.RefreshToken,
+		AccessToken:  auth.EncodeKey(token.Code),
+		RefreshToken: auth.EncodeKey(token.RefreshToken),
 		ExpiresIn:    3600,
 	}
 

@@ -31,17 +31,14 @@ type OAuthStore interface {
 	// Auth Code
 	InsertAuthCode(ctx context.Context, a *AuthCodeRow) error
 	GetAuthCode(ctx context.Context, code []byte) (*AuthCodeRow, error)
-	UpdateAuthCode(ctx context.Context, a *AuthCodeRow) error
+	// UpdateAuthCode(ctx context.Context, a *AuthCodeRow) error
 	DeleteAuthCode(ctx context.Context, code []byte) error
 
 	// Access Token
 	InsertAccessToken(ctx context.Context, a *AccessTokenRow) error
-	GetAccessToken(ctx context.Context, token []byte) (*AccessTokenRow, error)
-	UpdateAccessToken(ctx context.Context, a *AccessTokenRow) error
+	GetAccessTokenByRefresh(ctx context.Context, refreshToken []byte) (*AccessTokenRow, error)
 	DeleteAccessToken(ctx context.Context, token []byte) error
 
-	// Include user
-	GetAuthCodeAndUser(ctx context.Context, code []byte) (*UserRow, *AuthCodeRow, error)
 	GetAccessTokenAndUser(ctx context.Context, token []byte) (*UserRow, *AccessTokenRow, error)
 }
 

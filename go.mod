@@ -10,7 +10,6 @@ require (
 	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
-	github.com/golang/protobuf v1.4.3
 	github.com/google/uuid v1.1.2
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
 	github.com/jackc/pgx/v4 v4.9.0
