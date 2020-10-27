@@ -71,7 +71,7 @@ func (o *OAuthStorePG) GetAccessTokenAndUser(ctx context.Context, token []byte) 
 	a := &AccessTokenRow{}
 	u := &UserRow{}
 	result := o.db.QueryRow(ctx,
-		"SELECT * FROM AccessTokens a JOIN Users u ON s.user_id=u.id WHERE a.token=$1",
+		"SELECT * FROM AccessTokens a JOIN Users u ON a.user_id=u.id WHERE a.token=$1",
 		&token,
 	)
 	err := result.Scan(

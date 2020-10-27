@@ -4,7 +4,9 @@ import (
 	"context"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -22,7 +24,15 @@ func TestOAuthStorePG_InsertAuthCode(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "valid",
+			args: args{
+				ctx: context.Background(),
+				a:   &AuthCodeRow{Code: []byte("test_code"), ClientID: "test_client", Scope: "test_scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")},
+			},
+			fields:  fields{db: db},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -51,7 +61,16 @@ func TestOAuthStorePG_GetAuthCode(t *testing.T) {
 		want    *AuthCodeRow
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "valid",
+			args: args{
+				ctx:  context.Background(),
+				code: []byte("get_code"),
+			},
+			fields:  fields{db: db},
+			want:    &AuthCodeRow{Code: []byte("get_code"), ClientID: "get_client", Scope: "get_scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -84,7 +103,12 @@ func TestOAuthStorePG_DeleteAuthCode(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name:    "valid",
+			args:    args{ctx: context.Background(), code: []byte("delete_code")},
+			fields:  fields{db: db},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -112,7 +136,19 @@ func TestOAuthStorePG_InsertAccessToken(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "valid",
+			args: args{ctx: context.Background(),
+				a: &AccessTokenRow{AuthCode: []byte("get_code"),
+					Created:      time.Unix(1000, 0),
+					Expires:      3600,
+					RefreshToken: []byte("token"),
+					Token:        []byte("token"),
+					UserID:       uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")},
+			},
+			fields:  fields{db: db},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -141,7 +177,13 @@ func TestOAuthStorePG_GetAccessTokenByRefresh(t *testing.T) {
 		want    *AccessTokenRow
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name:    "valid",
+			args:    args{ctx: context.Background(), refreshToken: []byte("refresh_token")},
+			fields:  fields{db: db},
+			want:    &AccessTokenRow{AuthCode: []byte("get_code"), Created: time.Unix(1000, 0), Expires: 3600, RefreshToken: []byte("refresh_token"), Token: []byte("refresh_token"), UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -154,7 +196,7 @@ func TestOAuthStorePG_GetAccessTokenByRefresh(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("OAuthStorePG.GetAccessTokenByRefresh() = %v, want %v", got, tt.want)
+				t.Errorf("OAuthStorePG.GetAccessTokenByRefresh() = \n%v, \nwant %v", got, tt.want)
 			}
 		})
 	}
@@ -174,7 +216,12 @@ func TestOAuthStorePG_DeleteAccessToken(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name:    "valid",
+			args:    args{ctx: context.Background(), token: []byte("delete_token")},
+			fields:  fields{db: db},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -204,7 +251,17 @@ func TestOAuthStorePG_GetAccessTokenAndUser(t *testing.T) {
 		want1   *AccessTokenRow
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "valid",
+			args: args{
+				ctx:   context.Background(),
+				token: []byte("refresh_token"),
+			},
+			fields:  fields{db: db},
+			want:    &UserRow{ID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"), Email: "get@test.test", Username: "get", Birthdate: time.Unix(0, 0).UTC(), PasswordHash: []byte("pass")},
+			want1:   &AccessTokenRow{AuthCode: []byte("get_code"), Created: time.Unix(1000, 0), Expires: 3600, RefreshToken: []byte("refresh_token"), Token: []byte("refresh_token"), UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

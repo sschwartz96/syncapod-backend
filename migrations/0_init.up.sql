@@ -19,7 +19,7 @@ CREATE TABLE AuthCodes (
 	code BYTEA PRIMARY KEY,
 	client_id TEXT NOT NULL,
 	user_id UUID NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
-	score TEXT NOT NULL
+	scope TEXT NOT NULL
 );
 
 CREATE TABLE AccessTokens (

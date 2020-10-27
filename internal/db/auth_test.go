@@ -4,42 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/ory/dockertest"
 )
 
 var db *pgxpool.Pool
 
 // user TestMain to setup
 func TestMain(m *testing.M) {
-	// connect to docker pool
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("Could not connect to docker: %v", err)
-	}
-
-	// startup docker container
-	resource, err := pool.Run("postgres", "", []string{"POSTGRES_PASSWORD=secret"})
-	if err != nil {
-		log.Fatalf("Could not start docker resource: %v", err)
-	}
-
 	// connect stop after 5 seconds
 	start := time.Now()
 	fiveSec := time.Second * 5
-	port := resource.GetPort("5432/tcp")
-	log.Println("port connected:", port)
-	err = errors.New("start loop")
+	err := errors.New("start loop")
 	for err != nil {
 		if time.Since(start) > fiveSec {
 			log.Fatal(`Could not connect to postgres\n
@@ -47,27 +29,17 @@ func TestMain(m *testing.M) {
 		}
 		db, err = pgxpool.Connect(context.Background(),
 			fmt.Sprintf(
-				"postgres://postgres:secret@localhost:%s/postgres?sslmode=disable",
-				port,
+				"postgres://postgres:secret@localhost:5432/postgres?sslmode=disable",
 			),
 		)
 		time.Sleep(time.Millisecond * 250)
 	}
-
-	// run migrations up
-	migrateUp()
 
 	// setup db
 	setupAuthDB()
 
 	// run tests
 	runCode := m.Run()
-
-	// cleanup
-	err = pool.Purge(resource)
-	if err != nil {
-		log.Fatalf("Could not purge resource: %v", err)
-	}
 
 	os.Exit(runCode)
 }
@@ -573,50 +545,6 @@ func TestAuthStorePG_GetSessionAndUser(t *testing.T) {
 	}
 }
 
-func migrateUp() {
-	// get all migration(up) files
-	files := getMigrateUpFiles()
-
-	// files should be in order because the names start with the number
-	log.Println("migration files:", files)
-	for _, f := range files {
-		sqlCmd, err := ioutil.ReadFile(f)
-		if err != nil {
-			log.Fatalf("could not read from file: %v", err)
-		}
-		c, err := db.Exec(context.Background(), string(sqlCmd))
-		if err != nil {
-			log.Fatalf("could not run migrate command: %s, error: %v", string(sqlCmd), err)
-		}
-		log.Println(c.String())
-	}
-}
-func getMigrateUpFiles() []string {
-	// get working directory
-	wd, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("Could not get working directory: %v", err)
-	}
-	// find the syncapod-backend directory
-	split := strings.SplitAfter(wd, "syncapod-backend")
-	if len(split) != 2 {
-		log.Fatalf("Could not find syncapod-backend directory: %v", err)
-	}
-	syncapodDir := split[0]
-	// scan files
-	upFiles := []string{}
-	err = filepath.Walk(syncapodDir, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			return nil
-		}
-		if strings.Contains(info.Name(), ".up.") && !strings.Contains(info.Name(), ".swp") {
-			upFiles = append(upFiles, filepath.Join(syncapodDir, "migrations", info.Name()))
-		}
-		return nil
-	})
-	return upFiles
-}
-
 func setupAuthDB() {
 	// test users
 	getUser := &UserRow{ID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"), Email: "get@test.test", Username: "get", Birthdate: time.Unix(10000, 0).UTC(), PasswordHash: []byte("pass")}
@@ -638,6 +566,18 @@ func setupAuthDB() {
 	deleteSesh := &SessionRow{ID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d87ae20c8bc"), UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"),
 		Expires: time.Unix(1000, 0), LastSeenTime: time.Unix(1000, 0), LoginTime: time.Unix(1000, 0), UserAgent: "testAgent"}
 	insertSession(deleteSesh)
+
+	// test auth codes
+	getAuth := &AuthCodeRow{Code: []byte("get_code"), ClientID: "get_client", Scope: "get_scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")}
+	insertAuthCode(getAuth)
+	deleteAuth := &AuthCodeRow{Code: []byte("delete_code"), ClientID: "client", Scope: "scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")}
+	insertAuthCode(deleteAuth)
+
+	// test access tokens
+	getAccessByRefresh := &AccessTokenRow{AuthCode: []byte("get_code"), Created: time.Unix(1000, 0), Expires: 3600, RefreshToken: []byte("refresh_token"), Token: []byte("refresh_token"), UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")}
+	insertAccessToken(getAccessByRefresh)
+	deleteToken := &AccessTokenRow{AuthCode: []byte("get_code"), Created: time.Unix(1000, 0), Expires: 3600, RefreshToken: []byte("asdf"), Token: []byte("delete_token"), UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")}
+	insertAccessToken(deleteToken)
 }
 
 func insertUser(u *UserRow) {
@@ -655,5 +595,22 @@ func insertSession(s *SessionRow) {
 		s.ID, s.UserID, s.LoginTime, s.LastSeenTime, s.Expires, s.UserAgent)
 	if err != nil {
 		log.Fatalln("insertSession() error:", err)
+	}
+}
+
+func insertAuthCode(a *AuthCodeRow) {
+	_, err := db.Exec(context.Background(),
+		"INSERT INTO AuthCodes (code,client_id,user_id,scope) VALUES($1,$2,$3,$4)",
+		&a.Code, &a.ClientID, &a.UserID, &a.Scope)
+	if err != nil {
+		log.Fatalln("insertAuthCode() error:", err)
+	}
+}
+func insertAccessToken(a *AccessTokenRow) {
+	_, err := db.Exec(context.Background(),
+		"INSERT INTO AccessTokens (token,auth_code,refresh_token,user_id,created,expires) VALUES($1,$2,$3,$4,$5,$6)",
+		&a.Token, &a.AuthCode, &a.RefreshToken, &a.UserID, &a.Created, &a.Expires)
+	if err != nil {
+		log.Fatalln("insertAccessToken() error:", err)
 	}
 }
