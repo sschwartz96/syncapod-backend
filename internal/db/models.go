@@ -24,7 +24,7 @@ type AuthStore interface {
 	DeleteSession(ctx context.Context, id uuid.UUID) error
 
 	// Both
-	GetSessionAndUser(ctx context.Context, sessionID uuid.UUID) (*UserRow, *SessionRow, error)
+	GetSessionAndUser(ctx context.Context, sessionID uuid.UUID) (*SessionRow, *UserRow, error)
 }
 
 type OAuthStore interface {

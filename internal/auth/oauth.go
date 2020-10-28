@@ -83,6 +83,7 @@ func (a *AuthController) ValidateAccessToken(ctx context.Context, token string) 
 	if time.Now().After(tkn.Created.Add(time.Second * time.Duration(tkn.Expires))) {
 		return nil, errors.New("AuthController.ValidateAccessToken() error: expired access token")
 	}
+	user.PasswordHash = []byte{}
 	return user, nil
 }
 

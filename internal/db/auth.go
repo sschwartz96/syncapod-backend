@@ -12,6 +12,10 @@ type AuthStorePG struct {
 	db *pgxpool.Pool
 }
 
+func NewAuthStorePG(db *pgxpool.Pool) *AuthStorePG {
+	return &AuthStorePG{db: db}
+}
+
 // User
 func (a *AuthStorePG) InsertUser(ctx context.Context, u *UserRow) error {
 	_, err := a.db.Exec(ctx,

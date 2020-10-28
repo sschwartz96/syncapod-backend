@@ -52,7 +52,7 @@ func (a *AuthController) Login(ctx context.Context, username, password, agent st
 // Authorize queries db for session via id, validates and returns user info.
 // returns error if the session is not found or invalid
 func (a *AuthController) Authorize(ctx context.Context, sessionID uuid.UUID) (*db.UserRow, error) {
-	user, session, err := a.authStore.GetSessionAndUser(ctx, sessionID)
+	session, user, err := a.authStore.GetSessionAndUser(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("AuthController.Authorize() error finding session: %v", err)
 	}
@@ -63,6 +63,7 @@ func (a *AuthController) Authorize(ctx context.Context, sessionID uuid.UUID) (*d
 	session.LastSeenTime = time.Now()
 	session.Expires = time.Now().Add(time.Hour * 168)
 	go a.authStore.UpdateSession(context.Background(), session)
+	user.PasswordHash = []byte{}
 	return user, nil
 }
 

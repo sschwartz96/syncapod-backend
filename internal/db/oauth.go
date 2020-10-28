@@ -11,6 +11,10 @@ type OAuthStorePG struct {
 	db *pgxpool.Pool
 }
 
+func NewOAuthStorePG(db *pgxpool.Pool) *OAuthStorePG {
+	return &OAuthStorePG{db: db}
+}
+
 func (o *OAuthStorePG) InsertAuthCode(ctx context.Context, a *AuthCodeRow) error {
 	_, err := o.db.Exec(ctx,
 		"INSERT INTO AuthCodes (code,client_id,user_id,scope) VALUES($1,$2,$3,$4)",
