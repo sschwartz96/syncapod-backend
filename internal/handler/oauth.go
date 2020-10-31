@@ -29,7 +29,6 @@ func CreateOauthHandler(authController auth.Auth, clientID, clientSecret string)
 	if err != nil {
 		return nil, err
 	}
-
 	return &OauthHandler{
 		authController: authController,
 		loginTemplate:  loginT,
@@ -54,19 +53,19 @@ func (h *OauthHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 }
 
 // Post hanldes all post request at the oauth endpoint
-func (h *OauthHandler) Post(res http.ResponseWriter, req *http.Request) {
-	var head string
-	head, req.URL.Path = ShiftPath(req.URL.Path)
-	// path: /oauth/*
-	switch head {
-	case "login":
-		h.Login(res, req)
-	case "authorize":
-		h.Authorize(res, req)
-	case "token":
-		h.Token(res, req)
-	}
-}
+//func (h *OauthHandler) Post(res http.ResponseWriter, req *http.Request) {
+//	var head string
+//	head, req.URL.Path = ShiftPath(req.URL.Path)
+//	// path: /oauth/*
+//	switch head {
+//	case "login":
+//		h.Login(res, req)
+//	case "authorize":
+//		h.Authorize(res, req)
+//	case "token":
+//		h.Token(res, req)
+//	}
+//}
 
 // Login handles the post and get request of a login page
 func (h *OauthHandler) Login(res http.ResponseWriter, req *http.Request) {
@@ -128,7 +127,7 @@ func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
 	seshKey := strings.TrimSpace(req.URL.Query().Get("sesh_key"))
 	seshID, err := uuid.Parse(seshKey)
 	if err != nil {
-		fmt.Println("invalid key: ", err)
+		fmt.Println(" key: ", err)
 		http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
 		return
 	}
@@ -153,30 +152,29 @@ func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
 	// add query params
 	values := url.Values{}
 	values.Add("state", req.URL.Query().Get("state"))
-	values.Add("code", authCode.Code)
+	values.Add("code", auth.EncodeKey(authCode.Code))
 
 	// redirect
-	fmt.Println("auth: redirecting to: ", redirectURI+"?"+values.Encode())
+	fmt.Println("oauth: redirecting to: ", redirectURI+"?"+values.Encode())
 	http.Redirect(res, req, redirectURI+"?"+values.Encode(), http.StatusSeeOther)
 }
 
 // Token handles authenticating the oauth client with the given token
 func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 	// authenticate client
-	id, sec, ok := req.BasicAuth()
+	id, secret, ok := req.BasicAuth()
 	if !ok {
 		fmt.Println("not using basic authentication?")
 		return
 	}
-	fmt.Printf("id: %v & secret: %v\n", id, sec)
-	if id != h.clientID || sec != h.clientSecret {
+	if id != h.clientID || secret != h.clientSecret {
 		fmt.Println("incorrect credentials")
 		return
 	}
 
 	// ^^^^^^^^^^ client is authenticated after above ^^^^^^^^^^
 	var queryCode string
-	// find grant type: refresh_token or authorization_code
+	// find grant type: refresh token else authorization code
 	grantType := req.FormValue("grant_type")
 	if strings.ToLower(grantType) == "refresh_token" {
 		refreshToken := req.FormValue("refresh_token")
@@ -191,7 +189,6 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 	} else {
 		queryCode = req.FormValue("code")
 	}
-
 	// validate auth code
 	authCode, err := h.authController.ValidateAuthCode(req.Context(), queryCode)
 	if err != nil {
@@ -200,7 +197,6 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 		// TODO: send more appropriate error response
 		return
 	}
-
 	// create access token
 	token, err := h.authController.CreateAccessToken(req.Context(), authCode)
 	if err != nil {
@@ -209,7 +205,6 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 		http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
 		return
 	}
-
 	// setup json
 	type tokenResponse struct {
 		AccessToken  string `json:"access_token"`
@@ -217,11 +212,10 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 		ExpiresIn    int    `json:"expires_in"`
 	}
 	tRes := &tokenResponse{
-		AccessToken:  auth.EncodeKey(token.Code),
+		AccessToken:  auth.EncodeKey(token.AuthCode),
 		RefreshToken: auth.EncodeKey(token.RefreshToken),
 		ExpiresIn:    3600,
 	}
-
 	// marshal data and send off
 	json, _ := json.Marshal(&tRes)
 	res.Header().Set("Content-Type", "application/json")

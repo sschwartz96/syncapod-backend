@@ -18,10 +18,10 @@ clean:
 
 test:
 	docker run -d --rm -ti --name pg_test --network host -e POSTGRES_PASSWORD=secret postgres
-	sleep 1.25 # wait enough time to run migrations
+	sleep 2.25 # wait enough time to run migrations
 	migrate  -source file://migrations \
 		-database postgres://postgres:secret@localhost/postgres?sslmode=disable up
-	richgo test ./... -race; docker stop pg_test -t 1
+	richgo test ./... -race -v; docker stop pg_test -t 1
 
 coverage:
 	docker run -d --rm -ti --name pg_test --network host -e POSTGRES_PASSWORD=secret postgres

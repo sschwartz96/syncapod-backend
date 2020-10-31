@@ -585,6 +585,7 @@ func insertUser(u *UserRow) {
 		"INSERT INTO users (id,email,username,birthdate,password_hash) VALUES($1,$2,$3,$4,$5)",
 		u.ID, u.Email, u.Username, u.Birthdate, u.PasswordHash)
 	if err != nil {
+		log.Println("insertUser() id:", u.ID)
 		log.Fatalln("insertUser() error:", err)
 	}
 }
