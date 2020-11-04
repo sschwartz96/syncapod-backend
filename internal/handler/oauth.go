@@ -52,25 +52,10 @@ func (h *OauthHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// Post hanldes all post request at the oauth endpoint
-//func (h *OauthHandler) Post(res http.ResponseWriter, req *http.Request) {
-//	var head string
-//	head, req.URL.Path = ShiftPath(req.URL.Path)
-//	// path: /oauth/*
-//	switch head {
-//	case "login":
-//		h.Login(res, req)
-//	case "authorize":
-//		h.Authorize(res, req)
-//	case "token":
-//		h.Token(res, req)
-//	}
-//}
-
 // Login handles the post and get request of a login page
 func (h *OauthHandler) Login(res http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
-		h.loginTemplate.Execute(res, true)
+		h.loginTemplate.Execute(res, false)
 		return
 	}
 	err := req.ParseForm()
@@ -82,7 +67,6 @@ func (h *OauthHandler) Login(res http.ResponseWriter, req *http.Request) {
 
 	username := req.FormValue("uname")
 	password := req.FormValue("pass")
-
 	_, sesh, err := h.authController.Login(req.Context(), username, password, req.UserAgent())
 	if err != nil {
 		h.loginTemplate.Execute(res, true)
@@ -90,9 +74,7 @@ func (h *OauthHandler) Login(res http.ResponseWriter, req *http.Request) {
 	}
 
 	req.Method = http.MethodGet
-
 	values := url.Values{}
-
 	values.Add("sesh_key", sesh.ID.String())
 	values.Add("client_id", req.URL.Query().Get("client_id"))
 	values.Add("redirect_uri", req.URL.Query().Get("redirect_uri"))
@@ -104,18 +86,6 @@ func (h *OauthHandler) Login(res http.ResponseWriter, req *http.Request) {
 // Authorize takes a session(access) token and validates it and sents back user info
 func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
-		//	key := strings.TrimSpace(req.URL.Query().Get("sesh_key"))
-		//	seshID, err := uuid.Parse(key)
-		//	if err != nil {
-		//		fmt.Println("invalid seshID: ", err)
-		//		http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
-		//	}
-		//	_, err = h.authController.Authorize(req.Context(), seshID)
-		//	if err != nil {
-		//		fmt.Println("couldn't not validate, redirecting to login page: ", err)
-		//		http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
-		//		return
-		//	}
 		err := h.authTemplate.Execute(res, nil)
 		if err != nil {
 			fmt.Println("OauthHandler.Authorize() error executing template: %v", err)
@@ -123,18 +93,26 @@ func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// setup redirect url
+	redirectURI := strings.TrimSpace(req.URL.Query().Get("redirect_uri"))
+	// add query params
+	values := url.Values{}
+	values.Add("state", req.URL.Query().Get("state"))
+
 	// get session key, validate and get user info
 	seshKey := strings.TrimSpace(req.URL.Query().Get("sesh_key"))
 	seshID, err := uuid.Parse(seshKey)
 	if err != nil {
-		fmt.Println(" key: ", err)
-		http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
+		fmt.Println("invalid session key: ", err)
+		values.Add("error", "invalid_request")
+		http.Redirect(res, req, redirectURI+"?"+values.Encode(), http.StatusNotFound)
 		return
 	}
 	user, err := h.authController.Authorize(req.Context(), seshID)
 	if err != nil {
 		fmt.Println("couldn't not validate, redirecting to login page: ", err)
-		http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
+		values.Add("error", "unauthorized_client")
+		http.Redirect(res, req, redirectURI+"?"+values.Encode(), http.StatusNotFound)
 		return
 	}
 
@@ -142,21 +120,16 @@ func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
 	clientID := strings.TrimSpace(req.URL.Query().Get("client_id"))
 	authCode, err := h.authController.CreateAuthCode(req.Context(), user.ID, clientID)
 	if err != nil {
-		//TODO: handle this error properly
 		fmt.Printf("error creating oauth authorization code: %v\n", err)
+		values.Add("error", "server_error")
+		http.Redirect(res, req, redirectURI+"?"+values.Encode(), http.StatusNotFound)
 	}
 
-	// setup redirect url
-	redirectURI := strings.TrimSpace(req.URL.Query().Get("redirect_uri"))
-
-	// add query params
-	values := url.Values{}
-	values.Add("state", req.URL.Query().Get("state"))
+	// add code to query params
 	values.Add("code", auth.EncodeKey(authCode.Code))
 
 	// redirect
-	fmt.Println("oauth: redirecting to: ", redirectURI+"?"+values.Encode())
-	http.Redirect(res, req, redirectURI+"?"+values.Encode(), http.StatusSeeOther)
+	http.Redirect(res, req, redirectURI+"?"+values.Encode(), http.StatusOK)
 }
 
 // Token handles authenticating the oauth client with the given token
@@ -180,9 +153,8 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 		refreshToken := req.FormValue("refresh_token")
 		accessToken, err := h.authController.ValidateRefreshToken(req.Context(), refreshToken)
 		if err != nil {
-			fmt.Println("couldn't find token based on refresh: ", err)
-			http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
-			//TODO: fail gracefully??
+			fmt.Println("couldn't find token based on refresh token: ", err)
+			sendTokenError(res, "invalid_grant")
 			return
 		}
 		queryCode = auth.EncodeKey(accessToken.AuthCode)
@@ -193,16 +165,14 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 	authCode, err := h.authController.ValidateAuthCode(req.Context(), queryCode)
 	if err != nil {
 		fmt.Println("couldn't find auth code: ", err)
-		http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
-		// TODO: send more appropriate error response
+		sendTokenError(res, "invalid_grant")
 		return
 	}
 	// create access token
 	token, err := h.authController.CreateAccessToken(req.Context(), authCode)
 	if err != nil {
 		fmt.Println("error oauth handler(Token), could not create access token:", err)
-		// TODO: send error message back
-		http.Redirect(res, req, "/oauth/login", http.StatusSeeOther)
+		sendTokenError(res, "invalid_request")
 		return
 	}
 	// setup json
@@ -220,4 +190,14 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 	json, _ := json.Marshal(&tRes)
 	res.Header().Set("Content-Type", "application/json")
 	res.Write(json)
+}
+
+func sendTokenError(res http.ResponseWriter, err string) {
+	type tokenErrorResponse struct {
+		Error string `json:"error"`
+	}
+	errRes := &tokenErrorResponse{err}
+	errResJson, _ := json.Marshal(errRes)
+	res.WriteHeader(http.StatusBadRequest)
+	res.Write(errResJson)
 }
