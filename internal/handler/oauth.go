@@ -24,8 +24,11 @@ type OauthHandler struct {
 
 // CreateOauthHandler just intantiates an OauthHandler
 func CreateOauthHandler(authController auth.Auth, clientID, clientSecret string) (*OauthHandler, error) {
-	loginT, err := template.ParseFiles("templates/oauth/login.gohtml")
-	authT, err := template.ParseFiles("templates/oauth/auth.gohtml")
+	loginT, err := template.ParseFiles("./templates/oauth/login.gohtml")
+	if err != nil {
+		return nil, err
+	}
+	authT, err := template.ParseFiles("./templates/oauth/auth.gohtml")
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +91,7 @@ func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
 		err := h.authTemplate.Execute(res, nil)
 		if err != nil {
-			fmt.Println("OauthHandler.Authorize() error executing template: %v", err)
+			fmt.Println("OauthHandler.Authorize() error executing template:", err)
 		}
 		return
 	}

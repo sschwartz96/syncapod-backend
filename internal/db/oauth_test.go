@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -28,7 +27,7 @@ func TestOAuthStorePG_InsertAuthCode(t *testing.T) {
 			name: "valid",
 			args: args{
 				ctx: context.Background(),
-				a:   &AuthCodeRow{Code: []byte("test_code"), ClientID: "test_client", Scope: "test_scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")},
+				a:   &AuthCodeRow{Code: []byte("test_code"), ClientID: "test_client", Scope: "test_scope", UserID: getUserID},
 			},
 			fields:  fields{db: db},
 			wantErr: false,
@@ -68,7 +67,7 @@ func TestOAuthStorePG_GetAuthCode(t *testing.T) {
 				code: []byte("get_code"),
 			},
 			fields:  fields{db: db},
-			want:    &AuthCodeRow{Code: []byte("get_code"), ClientID: "get_client", Scope: "get_scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")},
+			want:    &AuthCodeRow{Code: []byte("get_code"), ClientID: "get_client", Scope: "get_scope", UserID: getUserID},
 			wantErr: false,
 		},
 	}
@@ -144,7 +143,7 @@ func TestOAuthStorePG_InsertAccessToken(t *testing.T) {
 					Expires:      3600,
 					RefreshToken: []byte("token"),
 					Token:        []byte("token"),
-					UserID:       uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")},
+					UserID:       getUserID},
 			},
 			fields:  fields{db: db},
 			wantErr: false,
@@ -181,7 +180,7 @@ func TestOAuthStorePG_GetAccessTokenByRefresh(t *testing.T) {
 			name:    "valid",
 			args:    args{ctx: context.Background(), refreshToken: []byte("refresh_token")},
 			fields:  fields{db: db},
-			want:    &AccessTokenRow{AuthCode: []byte("get_code"), Created: time.Unix(1000, 0), Expires: 3600, RefreshToken: []byte("refresh_token"), Token: []byte("refresh_token"), UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")},
+			want:    &AccessTokenRow{AuthCode: []byte("get_code"), Created: time.Unix(1000, 0), Expires: 3600, RefreshToken: []byte("refresh_token"), Token: []byte("refresh_token"), UserID: getUserID},
 			wantErr: false,
 		},
 	}
@@ -258,8 +257,8 @@ func TestOAuthStorePG_GetAccessTokenAndUser(t *testing.T) {
 				token: []byte("refresh_token"),
 			},
 			fields:  fields{db: db},
-			want:    &UserRow{ID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"), Email: "get@test.test", Username: "get", Birthdate: time.Unix(0, 0).UTC(), PasswordHash: []byte("pass")},
-			want1:   &AccessTokenRow{AuthCode: []byte("get_code"), Created: time.Unix(1000, 0), Expires: 3600, RefreshToken: []byte("refresh_token"), Token: []byte("refresh_token"), UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")},
+			want:    &UserRow{ID: getUserID, Email: "get@test.test", Username: "get", Birthdate: time.Unix(0, 0).UTC(), PasswordHash: []byte("pass")},
+			want1:   &AccessTokenRow{AuthCode: []byte("get_code"), Created: time.Unix(1000, 0), Expires: 3600, RefreshToken: []byte("refresh_token"), Token: []byte("refresh_token"), UserID: getUserID},
 			wantErr: false,
 		},
 	}

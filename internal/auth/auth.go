@@ -29,6 +29,10 @@ type AuthController struct {
 	oauthStore db.OAuthStore
 }
 
+func CreateAuthController(aStore db.AuthStore, oStore db.OAuthStore) *AuthController {
+	return &AuthController{authStore: aStore, oauthStore: oStore}
+}
+
 // Login queries db for user and validates password.
 // On success, it creates session and inserts into db
 // returns error if user not found or password is invalid
@@ -53,15 +57,16 @@ func (a *AuthController) Login(ctx context.Context, username, password, agent st
 // returns error if the session is not found or invalid
 func (a *AuthController) Authorize(ctx context.Context, sessionID uuid.UUID) (*db.UserRow, error) {
 	session, user, err := a.authStore.GetSessionAndUser(ctx, sessionID)
+	now := time.Now()
 	if err != nil {
 		return nil, fmt.Errorf("AuthController.Authorize() error finding session: %v", err)
 	}
-	if session.Expires.After(time.Now()) {
+	if session.Expires.Before(now) {
 		go a.authStore.DeleteSession(context.Background(), sessionID)
 		return nil, fmt.Errorf("AuthController.Authorize() error: session expired")
 	}
-	session.LastSeenTime = time.Now()
-	session.Expires = time.Now().Add(time.Hour * 168)
+	session.LastSeenTime = now
+	session.Expires = now.Add(time.Hour * 168)
 	go a.authStore.UpdateSession(context.Background(), session)
 	user.PasswordHash = []byte{}
 	return user, nil

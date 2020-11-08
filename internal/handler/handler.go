@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"encoding/json"
+	"fmt"
 	"net/http"
 	"path"
 	"strings"
@@ -12,27 +12,16 @@ import (
 
 // Handler is the main handler for syncapod, all routes go through it
 type Handler struct {
-	authController auth.AuthController
-	oauthHandler   *OauthHandler
-	apiHandler     *APIHandler
+	oauthHandler *OauthHandler
 }
 
 // CreateHandler sets up the main handler
-func CreateHandler(config *config.Config) (*Handler, error) {
-	handler := &Handler{}
-	var err error
-
-	handler.oauthHandler, err = CreateOauthHandler(dbClient, config.AlexaClientID, config.AlexaSecret)
+func CreateHandler(config *config.Config, authC auth.Auth) (*Handler, error) {
+	oauthHandler, err := CreateOauthHandler(authC, config.AlexaClientID, config.AlexaSecret)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("CreateHandler() error creating oauthHandler: %v", err)
 	}
-
-	handler.apiHandler, err = CreateAPIHandler(dbClient)
-	if err != nil {
-		return nil, err
-	}
-
-	return handler, nil
+	return &Handler{oauthHandler: oauthHandler}, nil
 }
 
 // ServeHTTP handles all requests
@@ -43,32 +32,7 @@ func (h *Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	switch head {
 	case "oauth":
 		h.oauthHandler.ServeHTTP(res, req)
-	case "api":
-		h.apiHandler.ServeHTTP(res, req)
 	}
-}
-
-// sendMessageJSON is a helper method in which it decodes an object and sends
-// via http.ResponseWriter given, returns error if decode fails
-func sendObjectJSON(res http.ResponseWriter, object interface{}) error {
-	jsonRes, err := json.Marshal(object)
-	if err != nil {
-		return err
-	}
-	res.Header().Add("Content-Type", "application/json")
-	_, err = res.Write(jsonRes)
-	return err
-}
-
-func sendMessageJSON(res http.ResponseWriter, message string) error {
-	type Response struct {
-		Message string `json:"message"`
-	}
-	response := Response{Message: message}
-	// jsonRes, _ := json.Marshal(&response)
-	// res.Header().Add("Content-Type", "application/json")
-	// res.Write(jsonRes)
-	return sendObjectJSON(res, &response)
 }
 
 // ShiftPath splits off the first component of p, which will be cleaned of
