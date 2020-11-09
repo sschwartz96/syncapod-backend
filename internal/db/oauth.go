@@ -17,8 +17,8 @@ func NewOAuthStorePG(db *pgxpool.Pool) *OAuthStorePG {
 
 func (o *OAuthStorePG) InsertAuthCode(ctx context.Context, a *AuthCodeRow) error {
 	_, err := o.db.Exec(ctx,
-		"INSERT INTO AuthCodes (code,client_id,user_id,scope) VALUES($1,$2,$3,$4)",
-		&a.Code, &a.ClientID, &a.UserID, &a.Scope)
+		"INSERT INTO AuthCodes (code,client_id,user_id,scope,expires) VALUES($1,$2,$3,$4,$5)",
+		&a.Code, &a.ClientID, &a.UserID, &a.Scope, &a.Expires)
 	if err != nil {
 		return fmt.Errorf("InsertAuthCode() error: %v", err)
 	}
@@ -28,7 +28,7 @@ func (o *OAuthStorePG) InsertAuthCode(ctx context.Context, a *AuthCodeRow) error
 func (o *OAuthStorePG) GetAuthCode(ctx context.Context, code []byte) (*AuthCodeRow, error) {
 	a := &AuthCodeRow{}
 	row := o.db.QueryRow(ctx, "SELECT * FROM AuthCodes WHERE code=$1", &code)
-	err := row.Scan(&a.Code, &a.ClientID, &a.UserID, &a.Scope)
+	err := row.Scan(&a.Code, &a.ClientID, &a.UserID, &a.Scope, &a.Expires)
 	if err != nil {
 		return nil, fmt.Errorf("GetAuthCode() error scanning row: %v", err)
 	}

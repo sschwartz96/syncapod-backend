@@ -97,6 +97,7 @@ func TestAuthController_CreateAccessToken(t *testing.T) {
 
 func TestAuthController_ValidateAuthCode(t *testing.T) {
 	gc, _ := DecodeKey("get_code")
+	ec, _ := DecodeKey("expire_code")
 	type fields struct {
 		authStore  db.AuthStore
 		oauthStore db.OAuthStore
@@ -119,6 +120,13 @@ func TestAuthController_ValidateAuthCode(t *testing.T) {
 			want:    &db.AuthCodeRow{Code: gc, ClientID: "get_client", Scope: "get_scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")},
 			wantErr: false,
 		},
+		{
+			name:    "expired",
+			args:    args{ctx: context.Background(), code: EncodeKey(ec)},
+			fields:  fields{authStore: authStore, oauthStore: oauthStore},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -131,7 +139,10 @@ func TestAuthController_ValidateAuthCode(t *testing.T) {
 				t.Errorf("AuthController.ValidateAuthCode() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if tt.want == nil {
+				return
+			}
+			if !reflect.DeepEqual(got.Code, tt.want.Code) {
 				t.Errorf("AuthController.ValidateAuthCode() = %v, want %v", got, tt.want)
 			}
 		})

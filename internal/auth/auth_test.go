@@ -258,10 +258,13 @@ func setupAuthDB() {
 
 	// test auth codes
 	gc, _ := DecodeKey("get_code")
-	getAuth := &db.AuthCodeRow{Code: gc, ClientID: "get_client", Scope: "get_scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")}
+	getAuth := &db.AuthCodeRow{Code: gc, ClientID: "get_client", Scope: "get_scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"), Expires: time.Now().Add(time.Minute * 5)}
 	insertAuthCode(getAuth)
+	ec, _ := DecodeKey("expired_code")
+	expiredAuth := &db.AuthCodeRow{Code: ec, ClientID: "client", Scope: "scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"), Expires: time.Now().Add(time.Minute * -5)}
+	insertAuthCode(expiredAuth)
 	dc, _ := DecodeKey("delete_code")
-	deleteAuth := &db.AuthCodeRow{Code: dc, ClientID: "client", Scope: "scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba")}
+	deleteAuth := &db.AuthCodeRow{Code: dc, ClientID: "client", Scope: "scope", UserID: uuid.MustParse("a813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"), Expires: time.Now().Add(time.Minute * 5)}
 	insertAuthCode(deleteAuth)
 
 	// test access tokens
@@ -295,8 +298,8 @@ func insertSession(s *db.SessionRow) {
 
 func insertAuthCode(a *db.AuthCodeRow) {
 	_, err := dbpg.Exec(context.Background(),
-		"INSERT INTO AuthCodes (code,client_id,user_id,scope) VALUES($1,$2,$3,$4)",
-		&a.Code, &a.ClientID, &a.UserID, &a.Scope)
+		"INSERT INTO AuthCodes (code,client_id,user_id,scope,expires) VALUES($1,$2,$3,$4,$5)",
+		&a.Code, &a.ClientID, &a.UserID, &a.Scope, &a.Expires)
 	if err != nil {
 		log.Fatalln("insertAuthCode() error:", err)
 	}

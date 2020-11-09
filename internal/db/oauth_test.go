@@ -67,7 +67,7 @@ func TestOAuthStorePG_GetAuthCode(t *testing.T) {
 				code: []byte("get_code"),
 			},
 			fields:  fields{db: db},
-			want:    &AuthCodeRow{Code: []byte("get_code"), ClientID: "get_client", Scope: "get_scope", UserID: getUserID},
+			want:    &AuthCodeRow{Code: []byte("get_code"), ClientID: "get_client", Scope: "get_scope", UserID: getUserID, Expires: time.Unix(0, 1000)},
 			wantErr: false,
 		},
 	}

@@ -68,6 +68,7 @@ type AuthCodeRow struct {
 	ClientID string    `json:"client_id"`
 	UserID   uuid.UUID `json:"user_id"`
 	Scope    Scope     `json:"scope"`
+	Expires  time.Time `json:"expires"`
 }
 
 // AccessToken contains the information to provide user access within oAuth scope

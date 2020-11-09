@@ -24,6 +24,7 @@ func (a *AuthController) CreateAuthCode(ctx context.Context, userID uuid.UUID, c
 		ClientID: clientID,
 		UserID:   userID,
 		Scope:    db.ReadChange,
+		Expires:  time.Now().Add(time.Minute * 5),
 	}
 	err = a.oauthStore.InsertAuthCode(ctx, code)
 	if err != nil {
@@ -65,6 +66,9 @@ func (a *AuthController) ValidateAuthCode(ctx context.Context, code string) (*db
 	authCode, err := a.oauthStore.GetAuthCode(ctx, decodedCode)
 	if err != nil {
 		return nil, fmt.Errorf("AuthController.ValidateAuthCode() error finding auth code: %v", err)
+	}
+	if authCode.Expires.Before(time.Now()) {
+		return nil, fmt.Errorf("AuthController.ValidateAuthCode() error auth code expired")
 	}
 	return authCode, nil
 }

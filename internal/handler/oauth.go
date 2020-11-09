@@ -132,7 +132,7 @@ func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
 	values.Add("code", auth.EncodeKey(authCode.Code))
 
 	// redirect
-	http.Redirect(res, req, redirectURI+"?"+values.Encode(), http.StatusOK)
+	http.Redirect(res, req, redirectURI+"?"+values.Encode(), http.StatusSeeOther)
 }
 
 // Token handles authenticating the oauth client with the given token

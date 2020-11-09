@@ -23,6 +23,7 @@ import (
 var testHandler *Handler
 
 func TestMain(t *testing.M) {
+	log.Println("running testMain")
 	// connect to db
 	pg, err := connectToDB()
 	if err != nil {
@@ -59,7 +60,7 @@ func Test_Oauth(t *testing.T) {
 	// oauth/login POST
 	res = httptest.NewRecorder()
 	req = httptest.NewRequest("POST", "https://syncapod.com/oauth/login", nil)
-	req.Form = url.Values{"uname": {"oauthTest"}, "pass": {"password"}}
+	req.Form = url.Values{"uname": {"oauthTest"}, "pass": {"password"}, "redirect_uri": {"https://testuri.com"}}
 	testHandler.oauthHandler.Login(res, req)
 	body, err = ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -89,7 +90,7 @@ func Test_Oauth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Test_Oauth() POST authorize error: %v", err)
 	}
-	log.Println("ouath auth POST:", req.URL)
+	log.Println("ouath auth POST:", res.Code)
 	//require.Contains(t, string(body), "<title>syncapod oauth authorization</title>")
 
 	//testHandler.oauthHandler.Token()

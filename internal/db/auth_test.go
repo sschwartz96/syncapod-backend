@@ -573,9 +573,9 @@ func setupAuthDB() {
 	insertSession(deleteSesh)
 
 	// test auth codes
-	getAuth := &AuthCodeRow{Code: []byte("get_code"), ClientID: "get_client", Scope: "get_scope", UserID: getUserID}
+	getAuth := &AuthCodeRow{Code: []byte("get_code"), ClientID: "get_client", Scope: "get_scope", UserID: getUserID, Expires: time.Unix(0, 1000)}
 	insertAuthCode(getAuth)
-	deleteAuth := &AuthCodeRow{Code: []byte("delete_code"), ClientID: "client", Scope: "scope", UserID: getUserID}
+	deleteAuth := &AuthCodeRow{Code: []byte("delete_code"), ClientID: "client", Scope: "scope", UserID: getUserID, Expires: time.Unix(0, 1500)}
 	insertAuthCode(deleteAuth)
 
 	// test access tokens
@@ -588,9 +588,10 @@ func setupAuthDB() {
 func insertUser(u *UserRow) {
 	_, err := db.Exec(context.Background(),
 		"INSERT INTO users (id,email,username,birthdate,password_hash) VALUES($1,$2,$3,$4,$5)",
-		u.ID, u.Email, u.Username, u.Birthdate, u.PasswordHash)
+		&u.ID, &u.Email, &u.Username, &u.Birthdate, &u.PasswordHash)
 	if err != nil {
 		log.Println("insertUser() id:", u.ID)
+		time.Sleep(time.Minute)
 		log.Fatalln("insertUser() error:", err)
 	}
 }
@@ -606,8 +607,8 @@ func insertSession(s *SessionRow) {
 
 func insertAuthCode(a *AuthCodeRow) {
 	_, err := db.Exec(context.Background(),
-		"INSERT INTO AuthCodes (code,client_id,user_id,scope) VALUES($1,$2,$3,$4)",
-		&a.Code, &a.ClientID, &a.UserID, &a.Scope)
+		"INSERT INTO AuthCodes (code,client_id,user_id,scope,expires) VALUES($1,$2,$3,$4,$5)",
+		&a.Code, &a.ClientID, &a.UserID, &a.Scope, &a.Expires)
 	if err != nil {
 		log.Fatalln("insertAuthCode() error:", err)
 	}
