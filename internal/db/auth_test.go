@@ -227,7 +227,7 @@ func TestAuthStorePG_UpdateUser(t *testing.T) {
 			name: "valid",
 			args: args{
 				ctx: context.Background(),
-				u:   &UserRow{ID: uuid.MustParse("b813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"), Email: "update@updated.test", Username: "updated", Birthdate: time.Unix(0, 0).UTC(), PasswordHash: []byte("pass")},
+				u:   &UserRow{ID: uuid.MustParse("b813c6e3-9cd0-4aed-9c4e-1d88ae20c777"), Email: "update@updated.test", Username: "updated", Birthdate: time.Unix(0, 0).UTC(), PasswordHash: []byte("pass")},
 			},
 			fields: fields{db: db},
 		},
@@ -270,7 +270,7 @@ func TestAuthStorePG_UpdateUserPassword(t *testing.T) {
 			name: "valid",
 			args: args{
 				ctx:           context.Background(),
-				id:            uuid.MustParse("c813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"),
+				id:            uuid.MustParse("c813c6e3-9cd0-4aed-9c4e-1d88ae20c777"),
 				password_hash: []byte("pass_updated"),
 			},
 			fields:  fields{db: db},
@@ -315,7 +315,7 @@ func TestAuthStorePG_DeleteUser(t *testing.T) {
 			name: "valid",
 			args: args{
 				ctx: context.Background(),
-				id:  uuid.MustParse("d813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"),
+				id:  uuid.MustParse("d813c6e3-9cd0-4aed-9c4e-1d88ae20c777"),
 			},
 			fields:  fields{db: db},
 			wantErr: false,
@@ -554,11 +554,11 @@ func setupAuthDB() {
 	// test users
 	getUser := &UserRow{ID: getUserID, Email: "get@test.test", Username: "get", Birthdate: time.Unix(10000, 0).UTC(), PasswordHash: []byte("pass")}
 	insertUser(getUser)
-	updateUser := &UserRow{ID: uuid.MustParse("b813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"), Email: "update@test.test", Username: "update", Birthdate: time.Unix(10001, 0).UTC(), PasswordHash: []byte("pass")}
+	updateUser := &UserRow{ID: uuid.MustParse("b813c6e3-9cd0-4aed-9c4e-1d88ae20c777"), Email: "update@test.test", Username: "update", Birthdate: time.Unix(10001, 0).UTC(), PasswordHash: []byte("pass")}
 	insertUser(updateUser)
-	updatePassUser := &UserRow{ID: uuid.MustParse("c813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"), Email: "updatePass@test.test", Username: "updatePass", Birthdate: time.Unix(10002, 0).UTC(), PasswordHash: []byte("pass")}
+	updatePassUser := &UserRow{ID: uuid.MustParse("c813c6e3-9cd0-4aed-9c4e-1d88ae20c777"), Email: "updatePass@test.test", Username: "updatePass", Birthdate: time.Unix(10002, 0).UTC(), PasswordHash: []byte("pass")}
 	insertUser(updatePassUser)
-	deleteUser := &UserRow{ID: uuid.MustParse("d813c6e3-9cd0-4aed-9c4e-1d88ae20c8ba"), Email: "delete@test.test", Username: "delete", Birthdate: time.Unix(10002, 0).UTC(), PasswordHash: []byte("pass")}
+	deleteUser := &UserRow{ID: uuid.MustParse("d813c6e3-9cd0-4aed-9c4e-1d88ae20c777"), Email: "delete@test.test", Username: "delete", Birthdate: time.Unix(10002, 0).UTC(), PasswordHash: []byte("pass")}
 	insertUser(deleteUser)
 
 	// test sessions
@@ -590,9 +590,8 @@ func insertUser(u *UserRow) {
 		"INSERT INTO users (id,email,username,birthdate,password_hash) VALUES($1,$2,$3,$4,$5)",
 		&u.ID, &u.Email, &u.Username, &u.Birthdate, &u.PasswordHash)
 	if err != nil {
-		log.Println("insertUser() id:", u.ID)
-		time.Sleep(time.Minute)
-		log.Fatalln("insertUser() error:", err)
+		log.Println("db.auth_test.insertUser() id:", u.ID)
+		log.Fatalln("db.auth_test.insertUser() error:", err)
 	}
 }
 
@@ -601,7 +600,7 @@ func insertSession(s *SessionRow) {
 		"INSERT INTO sessions (id,user_id,login_time,last_seen_time,expires,user_agent) VALUES($1,$2,$3,$4,$5,$6)",
 		s.ID, s.UserID, s.LoginTime, s.LastSeenTime, s.Expires, s.UserAgent)
 	if err != nil {
-		log.Fatalln("insertSession() error:", err)
+		log.Fatalln("db.auth_test.insertSession() error:", err)
 	}
 }
 
@@ -610,7 +609,7 @@ func insertAuthCode(a *AuthCodeRow) {
 		"INSERT INTO AuthCodes (code,client_id,user_id,scope,expires) VALUES($1,$2,$3,$4,$5)",
 		&a.Code, &a.ClientID, &a.UserID, &a.Scope, &a.Expires)
 	if err != nil {
-		log.Fatalln("insertAuthCode() error:", err)
+		log.Fatalln("db.auth_test.insertAuthCode() error:", err)
 	}
 }
 func insertAccessToken(a *AccessTokenRow) {
@@ -618,6 +617,6 @@ func insertAccessToken(a *AccessTokenRow) {
 		"INSERT INTO AccessTokens (token,auth_code,refresh_token,user_id,created,expires) VALUES($1,$2,$3,$4,$5,$6)",
 		&a.Token, &a.AuthCode, &a.RefreshToken, &a.UserID, &a.Created, &a.Expires)
 	if err != nil {
-		log.Fatalln("insertAccessToken() error:", err)
+		log.Fatalln("db.auth_test.insertAccessToken() error:", err)
 	}
 }

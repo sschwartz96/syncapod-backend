@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -48,53 +50,87 @@ func TestMain(t *testing.M) {
 
 func Test_Oauth(t *testing.T) {
 	// oauth/login GET
-	res := httptest.NewRecorder()
+	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "https://syncapod.com/oauth/login", nil)
-	testHandler.oauthHandler.Login(res, req)
-	body, err := ioutil.ReadAll(res.Body)
+	testHandler.oauthHandler.Login(rec, req)
+	body, err := ioutil.ReadAll(rec.Body)
 	if err != nil {
 		t.Fatalf("Test_Oauth() GET login error: %v", err)
 	}
 	require.Contains(t, string(body), "<h1>syncapod oauth2.0 login</h1>")
 
 	// oauth/login POST
-	res = httptest.NewRecorder()
+	rec = httptest.NewRecorder()
 	req = httptest.NewRequest("POST", "https://syncapod.com/oauth/login", nil)
 	req.Form = url.Values{"uname": {"oauthTest"}, "pass": {"password"}, "redirect_uri": {"https://testuri.com"}}
-	testHandler.oauthHandler.Login(res, req)
-	body, err = ioutil.ReadAll(res.Body)
+	testHandler.oauthHandler.Login(rec, req)
+	body, err = ioutil.ReadAll(rec.Body)
 	if err != nil {
 		t.Fatalf("Test_Oauth() POST login error: %v", err)
 	}
 	bodyString := string(body)
 	require.Contains(t, string(body), "<a href=\"/oauth/authorize?")
-	url := "https://syncapod.com" + bodyString[10:115]
-	// seshKey := bodyString[68:104]
-	//<a href="/oauth/authorize?client_id=&amp;redirect_uri=&amp;sesh_key=a1e34fc7-d657-40fb-abf4-b3b86a8f46be&amp;state=">See Other</a>.
+	uri := "https://syncapod.com/" + bodyString[10:115]
+	log.Println("uri:", uri)
 
 	// oauth/authorize GET
-	res = httptest.NewRecorder()
-	req = httptest.NewRequest("GET", url, nil)
-	testHandler.oauthHandler.Authorize(res, req)
-	body, err = ioutil.ReadAll(res.Body)
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest("GET", uri, nil)
+	testHandler.oauthHandler.Authorize(rec, req)
+	body, err = ioutil.ReadAll(rec.Body)
 	if err != nil {
 		t.Fatalf("Test_Oauth() GET authorize error: %v", err)
 	}
 	require.Contains(t, string(body), "<title>syncapod oauth authorization</title>")
 
 	// oauth/authorize POST
-	res = httptest.NewRecorder()
-	req = httptest.NewRequest("POST", url, nil)
-	testHandler.oauthHandler.Authorize(res, req)
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest("POST", uri, nil)
+	testHandler.oauthHandler.Authorize(rec, req)
+	res := rec.Result()
 	body, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		t.Fatalf("Test_Oauth() POST authorize error: %v", err)
 	}
-	log.Println("ouath auth POST:", res.Code)
-	//require.Contains(t, string(body), "<title>syncapod oauth authorization</title>")
+	require.Equal(t, res.StatusCode, 303)
+	loc, err := res.Location()
+	if err != nil {
+		t.Fatal("Test_Oauth() POST authorize location error")
+	}
+	authCode := loc.Query().Get("code")
+	require.NotEmpty(t, authCode)
 
-	//testHandler.oauthHandler.Token()
+	// oauth/token auth code
+	rec = httptest.NewRecorder()
+	vals := url.Values{}
+	vals.Set("grant_type", "authorization_code")
+	vals.Set("code", authCode)
+	req = httptest.NewRequest("POST", "https://syncapod.com/oauth/token", strings.NewReader(vals.Encode()))
+	req.SetBasicAuth("testClientID", "testClientSecret")
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Content-Length", strconv.Itoa(len(vals.Encode())))
+	testHandler.oauthHandler.Token(rec, req)
+	res = rec.Result()
+	body, _ = ioutil.ReadAll(res.Body)
+	log.Println(string(body))
+	require.Equal(t, 200, res.StatusCode)
+
+	// oauth/token refresh token
+
 }
+
+//func Test_HTTP(t *testing.T) {
+//	type args struct {
+//		method string
+//		url    string
+//	}
+//	tests := []struct {
+//		name         string
+//		args         args
+//		resultCode   int
+//		bodyContains string
+//	}{}
+//}
 
 func createTestOAuthHandler(authC auth.Auth) (*OauthHandler, error) {
 	loginT, err := template.ParseFiles("../../templates/oauth/login.gohtml")

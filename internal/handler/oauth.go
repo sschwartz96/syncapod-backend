@@ -114,7 +114,7 @@ func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
 	user, err := h.authController.Authorize(req.Context(), seshID)
 	if err != nil {
 		fmt.Println("couldn't not validate, redirecting to login page: ", err)
-		values.Add("error", "unauthorized_client")
+		values.Add("error", "access_denied")
 		http.Redirect(res, req, redirectURI+"?"+values.Encode(), http.StatusNotFound)
 		return
 	}
@@ -126,6 +126,7 @@ func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
 		fmt.Printf("error creating oauth authorization code: %v\n", err)
 		values.Add("error", "server_error")
 		http.Redirect(res, req, redirectURI+"?"+values.Encode(), http.StatusNotFound)
+		return
 	}
 
 	// add code to query params
@@ -137,22 +138,30 @@ func (h *OauthHandler) Authorize(res http.ResponseWriter, req *http.Request) {
 
 // Token handles authenticating the oauth client with the given token
 func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
-	// authenticate client
+	// authenticate client as per RFC 6749 2.3.1.
 	id, secret, ok := req.BasicAuth()
 	if !ok {
 		fmt.Println("not using basic authentication?")
+		sendTokenError(res, "unauthorized_client")
 		return
 	}
 	if id != h.clientID || secret != h.clientSecret {
 		fmt.Println("incorrect credentials")
+		sendTokenError(res, "unauthorized_client")
 		return
 	}
 
 	// ^^^^^^^^^^ client is authenticated after above ^^^^^^^^^^
 	var queryCode string
 	// find grant type: refresh token else authorization code
+	if err := req.ParseForm(); err != nil {
+		fmt.Println("OAuth.Token() error parsing form:", err)
+		sendTokenError(res, "server_error")
+		return
+	}
 	grantType := req.FormValue("grant_type")
-	if strings.ToLower(grantType) == "refresh_token" {
+	switch grantType {
+	case "refresh_token":
 		refreshToken := req.FormValue("refresh_token")
 		accessToken, err := h.authController.ValidateRefreshToken(req.Context(), refreshToken)
 		if err != nil {
@@ -161,9 +170,13 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 		queryCode = auth.EncodeKey(accessToken.AuthCode)
-	} else {
+	case "authorization_code":
 		queryCode = req.FormValue("code")
+	default:
+		sendTokenError(res, "invalid_grant")
+		return
 	}
+
 	// validate auth code
 	authCode, err := h.authController.ValidateAuthCode(req.Context(), queryCode)
 	if err != nil {
@@ -190,8 +203,16 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 		ExpiresIn:    3600,
 	}
 	// marshal data and send off
-	json, _ := json.Marshal(&tRes)
+	json, err := json.Marshal(&tRes)
+	if err != nil {
+		fmt.Println("OAuth.Token() error masrhalling json:", err)
+		// TODO: not technically a token request error message, but this shouldn't happen
+		sendTokenError(res, "server_error")
+		return
+	}
 	res.Header().Set("Content-Type", "application/json")
+	res.Header().Set("Cache-Control", "no-store")
+	res.Header().Set("Pragma", "no-cache")
 	res.Write(json)
 }
 
