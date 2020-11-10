@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -71,7 +72,6 @@ func Test_Oauth(t *testing.T) {
 	bodyString := string(body)
 	require.Contains(t, string(body), "<a href=\"/oauth/authorize?")
 	uri := "https://syncapod.com/" + bodyString[10:115]
-	log.Println("uri:", uri)
 
 	// oauth/authorize GET
 	rec = httptest.NewRecorder()
@@ -101,22 +101,40 @@ func Test_Oauth(t *testing.T) {
 	require.NotEmpty(t, authCode)
 
 	// oauth/token auth code
-	rec = httptest.NewRecorder()
+	rToken := testOauthToken(t, map[string]string{"grant_type": "authorization_code", "code": authCode})
+
+	// oauth/token refresh token
+	testOauthToken(t, map[string]string{"grant_type": "refresh_token", "refresh_token": rToken})
+}
+
+func testOauthToken(t *testing.T, urlValues map[string]string) string {
+	rec := httptest.NewRecorder()
 	vals := url.Values{}
-	vals.Set("grant_type", "authorization_code")
-	vals.Set("code", authCode)
-	req = httptest.NewRequest("POST", "https://syncapod.com/oauth/token", strings.NewReader(vals.Encode()))
+	for k, v := range urlValues {
+		vals.Set(k, v)
+	}
+	req := httptest.NewRequest("POST", "https://syncapod.com/oauth/token", strings.NewReader(vals.Encode()))
 	req.SetBasicAuth("testClientID", "testClientSecret")
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(vals.Encode())))
 	testHandler.oauthHandler.Token(rec, req)
-	res = rec.Result()
-	body, _ = ioutil.ReadAll(res.Body)
-	log.Println(string(body))
+
+	res := rec.Result()
 	require.Equal(t, 200, res.StatusCode)
 
-	// oauth/token refresh token
-
+	tRes := struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+	}{}
+	jsonDecoder := json.NewDecoder(res.Body)
+	err := jsonDecoder.Decode(&tRes)
+	if err != nil {
+		t.Fatalf("Test_Oauth() POST token: error decoding json response: %v", err)
+	}
+	require.NotEmpty(t, tRes.AccessToken)
+	require.NotEmpty(t, tRes.RefreshToken)
+	return tRes.RefreshToken
 }
 
 //func Test_HTTP(t *testing.T) {
