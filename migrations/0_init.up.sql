@@ -31,3 +31,10 @@ CREATE TABLE AccessTokens (
 	created TIMESTAMPTZ NOT NULL,
 	expires INT NOT NULL
 );
+
+CREATE TABLE Podcasts (
+	id UUID PRIMARY KEY,
+	title TEXT NOT NULL,
+	author TEXT NOT NULL,
+	episodic BOOLEAN DEFAULT true
+);

@@ -89,3 +89,73 @@ const (
 	Read       Scope = "Read"
 	ReadChange Scope = "ReadChange"
 )
+
+// Podcast contains information and xml struct tags for podcast
+type Podcast struct {
+	ID            uuid.UUID
+	Title         string     `xml:"title"`
+	Author        string     `xml:"author"`
+	Type          string     `xml:"type"`
+	Subtitle      string     `xml:"subtitle"`
+	Summary       string     `xml:"summary"`
+	Link          string     `xml:"Default link"`
+	Image         Image      `xml:"image"`
+	Explicit      string     `xml:"explicit"`
+	Language      string     `xml:"language"`
+	Keywords      string     `xml:"keywords"`
+	Category      []Category `xml:"category"`
+	PubDate       string     `xml:"pubDate"`
+	LastBuildDate string     `xml:"lastBuildDate"`
+	NewFeedURL    string     `xml:"new-feed-url"`
+	RSS           string
+	// not included in db
+	Episodes []Episode `xml:"item"`
+}
+
+// Episode holds information about a single episode of a podcast within the rss feed
+type Episode struct {
+	ID          uuid.UUID
+	PodcastID   uuid.UUID
+	Title       string       `xml:"title"`
+	Subtitle    string       `xml:"subtitle"`
+	Author      string       `xml:"author"`
+	Type        string       `xml:"type"`
+	Image       EpiImage     `xml:"image"`
+	Thumbnail   EpiThumbnail `xml:"content>thumbnail"`
+	PubDate     string       `xml:"pubDate"`
+	Description string       `xml:"description"`
+	Summary     string       `xml:"summary"`
+	Season      int          `xml:"season"`
+	Episode     int          `xml:"episode"`
+	Category    []Category   `xml:"category"`
+	Explicit    string       `xml:"explicit"`
+	Enclosure   Enclosure    `xml:"enclosure"`
+	Duration    string       `xml:"duration"`
+}
+
+// Enclosure represents enclosure xml object that contains mp3 data
+type Enclosure struct {
+	MP3 string `xml:"url,attr"`
+}
+
+// Category contains the main category and secondary categories
+type Category struct {
+	Text     string     `xml:"text,attr"`
+	Category []Category `xml:"category"`
+}
+
+// Image is the RSS image container
+type Image struct {
+	Title string `xml:"title"`
+	URL   string `xml:"url"`
+}
+
+// EpiImage is the image container for episodes
+type EpiImage struct {
+	HREF string `xml:"href,attr"`
+}
+
+// EpiThumbnail is the thumbnail container for rss episodes
+type EpiThumbnail struct {
+	URL string `xml:"url,attr"`
+}
