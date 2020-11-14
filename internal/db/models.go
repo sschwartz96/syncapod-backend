@@ -154,3 +154,9 @@ type Episode struct {
 	Encoded   string
 	PodcastID uuid.UUID
 }
+
+type Category struct {
+	ID       int
+	Name     string
+	ParentID int
+}

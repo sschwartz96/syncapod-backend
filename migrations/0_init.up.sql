@@ -84,3 +84,9 @@ CREATE TABLE Episode (
 	encoded TEXT,
 	podcast_id UUID  NOT NULL REFERENCES Podcasts(id) ON DELETE CASCADE
 );
+
+CREATE TABLE Categories (
+	id SERIAL,
+	name TEXT NOT NULL,
+	parent_id INTEGER NOT NULL REFERENCES Categories(id) ON DELETE CASCADE
+);

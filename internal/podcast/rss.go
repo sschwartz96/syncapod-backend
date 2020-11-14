@@ -1,4 +1,4 @@
-package rss
+package podcast
 
 import (
 	"context"
@@ -15,15 +15,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sschwartz96/syncapod-backend/internal/db"
-	"github.com/sschwartz96/syncapod-backend/internal/podcast"
 )
 
-type Controller struct {
-	podController *podcast.Controller
+type RSSController struct {
+	podController *Controller
 }
 
-func NewController(podController *podcast.Controller) *Controller {
-	return &Controller{podController: podController}
+func NewRSSController(podController *Controller) *RSSController {
+	return &RSSController{podController: podController}
 }
 
 var tzMap = map[string]string{
@@ -34,7 +33,7 @@ var tzMap = map[string]string{
 }
 
 // UpdatePodcasts attempts to go through the list of podcasts update them via RSS feed
-func (c *Controller) UpdatePodcasts() error {
+func (c *RSSController) UpdatePodcasts() error {
 	var podcasts []db.Podcast
 	var err error
 	// just increments start and end indices
@@ -66,7 +65,7 @@ func (c *Controller) UpdatePodcasts() error {
 }
 
 // updatePodcast updates the given podcast via RSS feed
-func (c *Controller) updatePodcast(pod *db.Podcast) error {
+func (c *RSSController) updatePodcast(pod *db.Podcast) error {
 	// get rss from url
 	rssResp, err := downloadRSS(pod.RSSURL)
 	if err != nil {
@@ -86,7 +85,7 @@ func (c *Controller) updatePodcast(pod *db.Podcast) error {
 	}
 
 	for e := range newPod.Channel.Item {
-		epi := convertEpisode(pod.ID, &newPod.Episodes[e])
+		epi := c.convertEpisode(pod.ID, &newPod.Episodes[e])
 		// check if the latest episode is in collection
 		exists, err := c.doesEpisodeExist(epi.Title, epi.PubDate)
 		if err != nil {
@@ -110,7 +109,7 @@ func (c *Controller) updatePodcast(pod *db.Podcast) error {
 
 // AddNewPodcast takes RSS url and downloads contents inserts the podcast and its episodes into the db
 // returns error if podcast already exists or connection error
-func (c *Controller) AddNewPodcast(url string) error {
+func (c *RSSController) AddNewPodcast(url string) error {
 	// check if podcast already contains that rss url
 	_, err := (url)
 	if exists {
@@ -341,4 +340,65 @@ func convertCategory(cat models.Category) *db.Category {
 		Category: convertCategories(cat.Category),
 	}
 	return newCat
+}
+
+type rss struct {
+	XMLName xml.Name `xml:"rss"`
+	Channel struct {
+		Title       string `xml:"title"`
+		Copyright   string `xml:"copyright"`
+		Link        string `xml:"link"`
+		Language    string `xml:"language"`
+		Description string `xml:"description"`
+		Author      string `xml:"author"`
+		Summary     string `xml:"summary"`
+		Explicit    string `xml:"explicit"`
+		Image       struct {
+			Text string `xml:",chardata"`
+			Href string `xml:"href,attr"`
+		} `xml:"image"`
+		Keywords string `xml:"keywords"`
+		Owner    struct {
+			Text  string `xml:",chardata"`
+			Name  string `xml:"name"`
+			Email string `xml:"email"`
+		} `xml:"owner"`
+		Categories []Category `xml:"category"`
+		Item       []rssItem  `xml:"item"`
+	} `xml:"channel"`
+}
+
+type rssItem struct {
+	Title string `xml:"title"`
+	Link  string `xml:"link"`
+	Guid  struct {
+		Text        string `xml:",chardata"`
+		IsPermaLink string `xml:"isPermaLink,attr"`
+	} `xml:"guid"`
+	PubDate   string `xml:"pubDate"`
+	Enclosure struct {
+		URL    string `xml:"url,attr"`
+		Length string `xml:"length,attr"`
+		Type   string `xml:"type,attr"`
+	} `xml:"enclosure"`
+	Description string `xml:"description"`
+	Encoded     string `xml:"encoded"`
+	EpisodeType string `xml:"episodeType"`
+	Episode     string `xml:"episode"`
+	Image       struct {
+		Href string `xml:"href,attr"`
+	} `xml:"image"`
+	Duration string `xml:"duration"`
+	Explicit string `xml:"explicit"`
+	Keywords string `xml:"keywords"`
+	Subtitle string `xml:"subtitle"`
+	Summary  string `xml:"summary"`
+	Creator  string `xml:"creator"`
+	Author   string `xml:"author"`
+}
+
+type Category struct {
+	ID            int
+	Name          string     `xml:"text,attr"`
+	Subcategories []Category `xml:"category"`
 }
