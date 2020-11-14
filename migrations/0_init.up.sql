@@ -3,7 +3,9 @@ CREATE TABLE Users (
 	email TEXT NOT NULL UNIQUE,
 	username TEXT NOT NULL UNIQUE,
 	birthdate DATE NOT NULL,
-	password_hash BYTEA NOT NULL
+	password_hash BYTEA NOT NULL,
+	created TIMESTAMPTZ NOT NULL,
+	last_seen TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE Sessions (
@@ -33,8 +35,52 @@ CREATE TABLE AccessTokens (
 );
 
 CREATE TABLE Podcasts (
+	-- REQUIRED TAGS
 	id UUID PRIMARY KEY,
 	title TEXT NOT NULL,
-	author TEXT NOT NULL,
-	episodic BOOLEAN DEFAULT true
+	description TEXT NOT NULL,
+	image_url TEXT NOT NULL,
+	language TEXT NOT NULL,
+	category INTEGER[] NOT NULL,
+	explicit TEXT NOT NULL,
+	-- RECOMMENDED TAGS
+	author TEXT,
+	link_url TEXT,
+	owner_name TEXT,
+	owner_email TEXT,
+	-- SITUATIONAL TAGS
+	episodic BOOLEAN DEFAULT TRUE, 
+	copyright TEXT,
+	block BOOLEAN,
+	complete BOOLEAN,
+	-- RSS/OTHER
+	pub_date TIMESTAMPTZ,
+	keywords TEXT,
+	summary TEXT,
+	rss_url TEXT NOT NULL
+);
+
+CREATE TABLE Episode (
+	-- REQUIRED TAGS
+	id UUID PRIMARY KEY,
+	title TEXT NOT NULL,
+	enclosure_url TEXT NOT NULL,
+	enclosure_length BIGINT NOT NULL,
+	enclosure_type TEXT NOT NULL,
+	-- RECOMMENDED TAGS
+	pub_date TIMESTAMPTZ,
+	description TEXT,
+	duration BIGINT,
+	link_url TEXT,
+	image_url TEXT,
+	explicit TEXT,
+	-- SITUATIONAL TAGS
+	episode INT,
+	season INT,
+	episode_type TEXT, -- Full, Trailer, Bonus
+	block BOOLEAN,
+	-- OTHER
+	summary TEXT,
+	encoded TEXT,
+	podcast_id UUID  NOT NULL REFERENCES Podcasts(id) ON DELETE CASCADE
 );
