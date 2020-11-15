@@ -10,6 +10,7 @@ import (
 
 type Controller struct {
 	podStore db.PodcastStore
+	catCache *CategoryCache
 }
 
 func NewController(podStore db.PodcastStore) *Controller {
@@ -26,6 +27,11 @@ func (c *Controller) FindPodcastsByRange(ctx context.Context, start, end int) ([
 	return nil, nil
 }
 
+func (c *Controller) InsertPodcast(ctx context.Context, pod *db.Podcast) error {
+	// TODO: implement
+	return nil
+}
+
 func (c *Controller) UpdatePodcast(ctx context.Context, pod *db.Podcast) error {
 	// TODO: implement
 	return nil
@@ -34,4 +40,9 @@ func (c *Controller) UpdatePodcast(ctx context.Context, pod *db.Podcast) error {
 func (c *Controller) DoesEpisodeExist(ctx context.Context, podID uuid.UUID, title string, pubDate time.Time) bool {
 	// TODO: implement
 	return true
+}
+
+func (c *Controller) InsertEpisode(ctx context.Context, epi *db.Episode) error {
+	// TODO: implement
+	return nil
 }

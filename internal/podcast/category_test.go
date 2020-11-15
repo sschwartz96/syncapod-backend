@@ -7,7 +7,7 @@ import (
 	"github.com/sschwartz96/syncapod-backend/internal/db"
 )
 
-var catCon = NewCategoryController(
+var catCon = NewCategoryCache(
 	[]db.Category{
 		{ID: 0, ParentID: 0, Name: "nil"},
 		{ID: 1, ParentID: 0, Name: "News"},

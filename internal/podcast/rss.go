@@ -84,16 +84,15 @@ func (c *RSSController) updatePodcast(pod *db.Podcast) error {
 		return fmt.Errorf("updatePodcast() error parsing RSS: %v", err)
 	}
 
-	for e := range newPod.Channel.Item {
-		epi := rssItemToDBEpisode(&newPod.Channel.Item[e], pod.ID)
+	for e := range newPod.Channel.Items {
+		epi := rssItemToDBEpisode(&newPod.Channel.Items[e], pod.ID)
 		// check if the latest episode is in collection
 		exists := c.podController.DoesEpisodeExist(context.Background(),
 			pod.ID, epi.Title, epi.PubDate)
 		// episode does not exist
 		if !exists {
-			err = c.podController.UpsertEpisode(context.Background(), epi)
+			err = c.podController.InsertEpisode(context.Background(), epi)
 			if err != nil {
-				fmt.Println("couldn't insert episode: ", err)
 				return fmt.Errorf("updatePodcast() error upserting episode: %v", err)
 			}
 		}
@@ -107,7 +106,7 @@ func (c *RSSController) AddNewPodcast(url string) error {
 	// check if podcast already contains that rss url
 	exists := c.podController.DoesPodcastExist(context.Background(), url)
 	if exists {
-		return errors.New("podcast already exists")
+		return errors.New("AddNewPodcast() podcast already exists")
 	}
 
 	// attempt to download & parse the podcast rss
@@ -119,7 +118,7 @@ func (c *RSSController) AddNewPodcast(url string) error {
 	defer func() {
 		err := rssResp.Close()
 		if err != nil {
-			log.Println("parseRSS() error closing r:", err)
+			log.Println("AddNewPodcast() error closing rss response:", err)
 		}
 	}()
 
@@ -127,42 +126,24 @@ func (c *RSSController) AddNewPodcast(url string) error {
 	if err != nil {
 		return err
 	}
-	pod := convertPodcast(url, rssPod)
+	pod := c.rssChannelToPodcast(&rssPod.Channel, uuid.New(), url)
 
-	// insert podcast first that way we don't add episodes without podcast
-	err = dbClient.Insert(database.ColPodcast, pod)
+	// insert podcast
+	err = c.podController.InsertPodcast(context.Background(), pod)
 	if err != nil {
-		return fmt.Errorf("error adding new podcast: %v", err)
+		return fmt.Errorf("AddNewPodcast() error adding new podcast: %v", err)
 	}
 
-	rssEpisodes := rssPod.RSSEpisodes
-
 	// loop through episodes and save them
-	for i := range rssEpisodes {
-		rssEpi := rssEpisodes[i]
-		rssEpi.ID = uuid.New()
-		rssEpi.PodcastID = rssPod.ID
-		if rssEpi.Author == "" {
-			rssEpi.Author = pod.Author
-		}
-
-		epi := convertEpisode(pod.Id, &rssEpi)
-
-		err = UpsertEpisode(dbClient, epi)
+	for i := range rssPod.Channel.Items {
+		epi := rssItemToDBEpisode(&rssPod.Channel.Items[i], pod.ID)
+		err = c.podController.InsertEpisode(context.Background(), epi)
 		if err != nil {
-			fmt.Println("couldn't insert episode: ", err)
+			fmt.Println("AddNewPodcast() couldn't insert episode: ", err)
 		}
 	}
 
 	return nil
-}
-
-func (r *RSSController) doesEpisodeExist(podID uuid.UUID, title string, pubDate time.Time) bool {
-	_, err := r.podController.FindEpisodeByTitle(context.Background(), podID, title)
-	if err != nil {
-		return false
-	}
-	return true
 }
 
 func downloadRSS(url string) (io.ReadCloser, error) {
@@ -249,29 +230,35 @@ func parseDuration(d string) (int64, error) {
 }
 
 type rss struct {
-	XMLName xml.Name `xml:"rss"`
-	Channel struct {
-		Title       string `xml:"title"`
-		Copyright   string `xml:"copyright"`
-		Link        string `xml:"link"`
-		Language    string `xml:"language"`
-		Description string `xml:"description"`
-		Author      string `xml:"author"`
-		Summary     string `xml:"summary"`
-		Explicit    string `xml:"explicit"`
-		Image       struct {
-			Text string `xml:",chardata"`
-			Href string `xml:"href,attr"`
-		} `xml:"image"`
-		Keywords string `xml:"keywords"`
-		Owner    struct {
-			Text  string `xml:",chardata"`
-			Name  string `xml:"name"`
-			Email string `xml:"email"`
-		} `xml:"owner"`
-		Categories []Category `xml:"category"`
-		Item       []rssItem  `xml:"item"`
-	} `xml:"channel"`
+	XMLName xml.Name   `xml:"rss"`
+	Channel rssChannel `xml:"channel"`
+}
+
+type rssChannel struct {
+	Title       string `xml:"title"`
+	Copyright   string `xml:"copyright"`
+	Link        string `xml:"link"`
+	Language    string `xml:"language"`
+	Description string `xml:"description"`
+	Author      string `xml:"author"`
+	Summary     string `xml:"summary"`
+	Explicit    string `xml:"explicit"`
+	Type        string `xml:"type"`
+	Complete    string `xml:"complete"`
+	Block       string `xml:"block"`
+	PubDate     string `xml:"pubDate"`
+	Image       struct {
+		Text string `xml:",chardata"`
+		Href string `xml:"href,attr"`
+	} `xml:"image"`
+	Keywords string `xml:"keywords"`
+	Owner    struct {
+		Text  string `xml:",chardata"`
+		Name  string `xml:"name"`
+		Email string `xml:"email"`
+	} `xml:"owner"`
+	Categories []Category `xml:"category"`
+	Items      []rssItem  `xml:"item"`
 }
 
 type rssItem struct {
@@ -310,26 +297,54 @@ type Category struct {
 	Subcategories []Category `xml:"category"`
 }
 
+func (c *RSSController) rssChannelToPodcast(r *rssChannel, id uuid.UUID, rssURL string) *db.Podcast {
+	pubDate, err := parseRFC2822ToUTC(r.PubDate)
+	if err != nil {
+		log.Println("rssChannelToPodcast() error converting pubdate:", err)
+	}
+	return &db.Podcast{
+		ID:          id,
+		Title:       r.Title,
+		Description: r.Description,
+		ImageURL:    r.Image.Href,
+		Language:    r.Language,
+		Category:    c.podController.catCache.TranslateCategories(r.Categories, []int{}),
+		Explicit:    r.Explicit,
+		Author:      r.Author,
+		LinkURL:     r.Link,
+		OwnerName:   r.Owner.Name,
+		OwnerEmail:  r.Owner.Email,
+		Episodic:    r.Type == "episodic",
+		Copyright:   r.Copyright,
+		Block:       strings.ToLower(r.Block) == "yes",
+		Complete:    strings.ToLower(r.Complete) == "yes",
+		PubDate:     *pubDate,
+		Keywords:    r.Keywords,
+		Summary:     r.Summary,
+		RSSURL:      rssURL,
+	}
+}
+
 func rssItemToDBEpisode(r *rssItem, podID uuid.UUID) *db.Episode {
 	enclosureLen, err := strconv.ParseInt(r.Enclosure.Length, 10, 64)
 	if err != nil {
-		log.Println("rssItemToDBEpisode() error parsing enclosure length: %v", err)
+		log.Println("rssItemToDBEpisode() error parsing enclosure length:", err)
 	}
 	pubDate, err := parseRFC2822ToUTC(r.PubDate)
 	if err != nil {
-		log.Println("rssItemToDBEpisode() error converting pubdate: %v", err)
+		log.Println("rssItemToDBEpisode() error converting pubdate:", err)
 	}
 	duration, err := strconv.ParseInt(r.Duration, 10, 64)
 	if err != nil {
-		log.Println("rssItemToDBEpisode() error parsing duration: %v", err)
+		log.Println("rssItemToDBEpisode() error parsing duration:", err)
 	}
 	episode, err := strconv.Atoi(r.Episode)
 	if err != nil {
-		log.Println("rssItemToDBEpisode() error parsing episode #: %v", err)
+		log.Println("rssItemToDBEpisode() error parsing episode #:", err)
 	}
 	season, err := strconv.Atoi(r.Season)
 	if err != nil {
-		log.Println("rssItemToDBEpisode() error parsing episode #: %v", err)
+		log.Println("rssItemToDBEpisode() error parsing episode #:", err)
 	}
 	return &db.Episode{
 		ID:              uuid.New(),

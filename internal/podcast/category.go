@@ -7,15 +7,15 @@ import (
 	"github.com/sschwartz96/syncapod-backend/internal/db"
 )
 
-type CategoryController struct {
+type CategoryCache struct {
 	// index represents id
 	dbCats []db.Category
 	// string represents category name
 	codes map[string]int
 }
 
-func NewCategoryController(dbCats []db.Category) *CategoryController {
-	con := CategoryController{dbCats: make([]db.Category, 0), codes: make(map[string]int)}
+func NewCategoryCache(dbCats []db.Category) *CategoryCache {
+	con := CategoryCache{dbCats: make([]db.Category, 0), codes: make(map[string]int)}
 	con.dbCats = append(con.dbCats, dbCats...)
 	for i := range dbCats {
 		con.codes[dbCats[i].Name] = dbCats[i].ID
@@ -26,7 +26,7 @@ func NewCategoryController(dbCats []db.Category) *CategoryController {
 // LookupIDs takes array of category ids, returns an array of Category
 // with their respective sub-categories, max recursive depth of Category is 2
 // parent categories MUST come before their children
-func (c *CategoryController) LookupIDs(ids []int) ([]Category, error) {
+func (c *CategoryCache) LookupIDs(ids []int) ([]Category, error) {
 	parentMap := map[int]*Category{}
 	// range all ids
 	for i := range ids {
@@ -57,7 +57,7 @@ func (c *CategoryController) LookupIDs(ids []int) ([]Category, error) {
 
 // TranslateCategories recursively appends category ids into the ids slice.
 // Uses the codes maps held within the CategoryController
-func (c *CategoryController) TranslateCategories(cats []Category, ids []int) []int {
+func (c *CategoryCache) TranslateCategories(cats []Category, ids []int) []int {
 	if cats == nil {
 		return ids
 	}
