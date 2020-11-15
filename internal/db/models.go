@@ -148,7 +148,7 @@ type Episode struct {
 	Episode     int
 	Season      int
 	EpisodeType string
-	Block       bool
+	//Block       bool
 	// OTHER
 	Summary   string
 	Encoded   string

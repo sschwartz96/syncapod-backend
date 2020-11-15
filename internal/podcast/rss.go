@@ -85,23 +85,17 @@ func (c *RSSController) updatePodcast(pod *db.Podcast) error {
 	}
 
 	for e := range newPod.Channel.Item {
-		epi := c.convertEpisode(pod.ID, &newPod.Episodes[e])
+		epi := rssItemToDBEpisode(&newPod.Channel.Item[e], pod.ID)
 		// check if the latest episode is in collection
-		exists, err := c.doesEpisodeExist(epi.Title, epi.PubDate)
-		if err != nil {
-			fmt.Println("couldn't tell if object exists: ", err)
-			continue
-		}
+		exists := c.podController.DoesEpisodeExist(context.Background(),
+			pod.ID, epi.Title, epi.PubDate)
 		// episode does not exist
 		if !exists {
-			err = UpsertEpisode(dbClient, epi)
+			err = c.podController.UpsertEpisode(context.Background(), epi)
 			if err != nil {
 				fmt.Println("couldn't insert episode: ", err)
 				return fmt.Errorf("updatePodcast() error upserting episode: %v", err)
 			}
-		} else {
-			// assume that if the first podcast exists so do the rest, no need to loop through all
-			break
 		}
 	}
 	return nil
@@ -111,7 +105,7 @@ func (c *RSSController) updatePodcast(pod *db.Podcast) error {
 // returns error if podcast already exists or connection error
 func (c *RSSController) AddNewPodcast(url string) error {
 	// check if podcast already contains that rss url
-	_, err := (url)
+	exists := c.podController.DoesPodcastExist(context.Background(), url)
 	if exists {
 		return errors.New("podcast already exists")
 	}
@@ -163,6 +157,14 @@ func (c *RSSController) AddNewPodcast(url string) error {
 	return nil
 }
 
+func (r *RSSController) doesEpisodeExist(podID uuid.UUID, title string, pubDate time.Time) bool {
+	_, err := r.podController.FindEpisodeByTitle(context.Background(), podID, title)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 func downloadRSS(url string) (io.ReadCloser, error) {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -184,81 +186,6 @@ func parseRSS(r io.Reader) (*rss, error) {
 	}
 	return rssFeed, nil
 }
-
-//// convertEpisode takes in id of parent podcast and RSSEpisode
-//// and returns a pointer to Episode
-//func convertEpisode(pID *db.ObjectID, e *models.RSSEpisode) *protos.Episode {
-//	pubDate, err := parseRFC2822ToUTC(e.PubDate)
-//	if err != nil {
-//		fmt.Println("convertEpisode() error converting episode:", err)
-//	}
-//	// no error since we are checking for one above
-//	pubTimestamp, _ := ptypes.TimestampProto(*pubDate)
-//
-//	image := &db.Image{Title: "", Url: e.Image.HREF}
-//
-//	dur, err := parseDuration(e.Duration)
-//	if err != nil {
-//		fmt.Println("convertEpisode() error parsing duration:", err)
-//	}
-//
-//	return &db.Episode{
-//		Id:             db.NewObjectID(),
-//		PodcastID:      pID,
-//		Title:          e.Title,
-//		Description:    e.Description,
-//		Subtitle:       e.Subtitle,
-//		Author:         e.Author,
-//		Type:           e.Type,
-//		Image:          image,
-//		PubDate:        pubTimestamp,
-//		Summary:        e.Summary,
-//		Season:         int32(e.Season),
-//		Episode:        int32(e.Episode),
-//		Category:       convertCategories(e.Category),
-//		Explicit:       e.Explicit,
-//		MP3URL:         e.Enclosure.MP3,
-//		DurationMillis: dur,
-//	}
-//}
-//
-//// convertPodcast
-//func convertPodcast(url string, p *models.RSSPodcast) *db.Podcast {
-//
-//	keywords := strings.Split(p.Keywords, ",")
-//	for w := range keywords {
-//		keywords[w] = strings.TrimSpace(keywords[w])
-//	}
-//
-//	lBuildDate, err := parseRFC2822ToUTC(p.LastBuildDate)
-//	if err != nil {
-//		fmt.Println("convertPodcast() couldn't parse podcast build date:", err)
-//	}
-//	buildTimestamp, _ := ptypes.TimestampProto(*lBuildDate)
-//
-//	pubDate, err := parseRFC2822ToUTC(p.PubDate)
-//	if err != nil {
-//		fmt.Println("convertPodcast() couldn't parse podcast pubdate:", err)
-//	}
-//	pubTimestamp, _ := ptypes.TimestampProto(*pubDate)
-//
-//	return &db.Podcast{
-//		Id:            db.NewObjectID(),
-//		Author:        p.Author,
-//		Category:      convertCategories(p.Category),
-//		Explicit:      p.Explicit,
-//		Image:         &db.Image{Title: p.Image.Title, Url: p.Image.URL},
-//		Keywords:      keywords,
-//		Language:      p.Language,
-//		LastBuildDate: buildTimestamp,
-//		PubDate:       pubTimestamp,
-//		Link:          p.Link,
-//		Rss:           url,
-//		Subtitle:      p.Subtitle,
-//		Title:         p.Title,
-//		Type:          p.Type,
-//	}
-//}
 
 func findTimezoneOffset(tz string) (string, error) {
 	offset, ok := tzMap[tz]
@@ -293,11 +220,6 @@ func parseRFC2822ToUTC(s string) (*time.Time, error) {
 	return &t, nil
 }
 
-func (r *RSSController) doesEpisodeExist(podID uuid.UUID, title string, pubDate time.Time) bool {
-	epi, err := r.podStore.FindEpisodeByTitle(podID, title)
-
-}
-
 //parseDuration takes in the string duration and returns the duration in millis
 func parseDuration(d string) (int64, error) {
 	if d == "" {
@@ -324,22 +246,6 @@ func parseDuration(d string) (int64, error) {
 	}
 
 	return millis, nil
-}
-
-func convertCategories(cats []models.Category) []*db.Category {
-	protoCats := make([]*db.Category, len(cats))
-	for i := range cats {
-		protoCats[i] = convertCategory(cats[i])
-	}
-	return protoCats
-}
-
-func convertCategory(cat models.Category) *db.Category {
-	newCat := &db.Category{
-		Text:     cat.Text,
-		Category: convertCategories(cat.Category),
-	}
-	return newCat
 }
 
 type rss struct {
@@ -385,6 +291,7 @@ type rssItem struct {
 	Encoded     string `xml:"encoded"`
 	EpisodeType string `xml:"episodeType"`
 	Episode     string `xml:"episode"`
+	Season      string `xml:"season"`
 	Image       struct {
 		Href string `xml:"href,attr"`
 	} `xml:"image"`
@@ -401,4 +308,46 @@ type Category struct {
 	ID            int
 	Name          string     `xml:"text,attr"`
 	Subcategories []Category `xml:"category"`
+}
+
+func rssItemToDBEpisode(r *rssItem, podID uuid.UUID) *db.Episode {
+	enclosureLen, err := strconv.ParseInt(r.Enclosure.Length, 10, 64)
+	if err != nil {
+		log.Println("rssItemToDBEpisode() error parsing enclosure length: %v", err)
+	}
+	pubDate, err := parseRFC2822ToUTC(r.PubDate)
+	if err != nil {
+		log.Println("rssItemToDBEpisode() error converting pubdate: %v", err)
+	}
+	duration, err := strconv.ParseInt(r.Duration, 10, 64)
+	if err != nil {
+		log.Println("rssItemToDBEpisode() error parsing duration: %v", err)
+	}
+	episode, err := strconv.Atoi(r.Episode)
+	if err != nil {
+		log.Println("rssItemToDBEpisode() error parsing episode #: %v", err)
+	}
+	season, err := strconv.Atoi(r.Season)
+	if err != nil {
+		log.Println("rssItemToDBEpisode() error parsing episode #: %v", err)
+	}
+	return &db.Episode{
+		ID:              uuid.New(),
+		Title:           r.Title,
+		EnclosureURL:    r.Enclosure.URL,
+		EnclosureLength: enclosureLen,
+		EnclosureType:   r.Enclosure.Type,
+		PubDate:         *pubDate,
+		Description:     r.Description,
+		Duration:        duration,
+		LinkURL:         r.Link,
+		ImageURL:        r.Image.Href,
+		Explicit:        r.Explicit,
+		Episode:         episode,
+		Season:          season,
+		EpisodeType:     r.EpisodeType,
+		Summary:         r.Summary,
+		Encoded:         r.Encoded,
+		PodcastID:       podID,
+	}
 }

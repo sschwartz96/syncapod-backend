@@ -78,7 +78,7 @@ CREATE TABLE Episode (
 	episode INT,
 	season INT,
 	episode_type TEXT, -- Full, Trailer, Bonus
-	block BOOLEAN,
+--	block BOOLEAN,
 	-- OTHER
 	summary TEXT,
 	encoded TEXT,
