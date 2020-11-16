@@ -18,10 +18,10 @@ import (
 )
 
 type RSSController struct {
-	podController *Controller
+	podController *PodController
 }
 
-func NewRSSController(podController *Controller) *RSSController {
+func NewRSSController(podController *PodController) *RSSController {
 	return &RSSController{podController: podController}
 }
 

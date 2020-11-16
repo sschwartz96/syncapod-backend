@@ -1,6 +1,29 @@
 package podcast
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+	"time"
+
+	"github.com/sschwartz96/syncapod-backend/internal/db"
+)
+
+func Test_RSS(t *testing.T) {
+	podStore := db.NewPodcastStorePG(testDB)
+	podController := NewPodController(podStore)
+	rssController := NewRSSController(podController)
+	gotimeURL := "https://changelog.com/gotime/feed"
+
+	// test add the podcast
+	err := rssController.AddNewPodcast(gotimeURL)
+	if err != nil {
+		t.Fatalf("Test_RSS() error adding new podcast: %v")
+	}
+
+	// delete the last episode to air
+
+	// test update the podcast
+}
 
 func Test_parseDuration(t *testing.T) {
 	type args struct {
@@ -37,6 +60,48 @@ func Test_parseDuration(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("parseDuration() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_parseRFC2822(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    time.Time
+		wantErr bool
+	}{
+		{
+			name: "1",
+			args: args{
+				s: "Thu, 08 Oct 2020 15:30:00 +0000",
+			},
+			want:    time.Unix(1602171000, 0),
+			wantErr: false,
+		},
+		{
+			name: "2",
+			args: args{
+				s: "Tue, 06 Oct 2020 20:00:00 PDT",
+			},
+			want:    time.Unix(1602039600, 0),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := parseRFC2822ToUTC(tt.args.s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseRFC2822() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got.UTC(), tt.want.UTC()) {
+				t.Errorf("parseRFC2822() = %v, want %v", got.UTC(), tt.want.UTC())
 			}
 		})
 	}
