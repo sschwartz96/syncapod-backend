@@ -1,28 +1,56 @@
 package podcast
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/sschwartz96/syncapod-backend/internal/db"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_RSS(t *testing.T) {
-	podStore := db.NewPodcastStorePG(testDB)
-	podController := NewPodController(podStore)
+	podStore := db.NewPodcastStore(testDB)
+	podController, err := NewPodController(podStore)
+	if err != nil {
+		t.Fatalf("Test_RSS error setting up: %v", err)
+	}
 	rssController := NewRSSController(podController)
 	gotimeURL := "https://changelog.com/gotime/feed"
 
 	// test add the podcast
-	err := rssController.AddNewPodcast(gotimeURL)
+	podID, err := rssController.AddNewPodcast(gotimeURL)
 	if err != nil {
-		t.Fatalf("Test_RSS() error adding new podcast: %v")
+		t.Fatalf("Test_RSS() error adding new podcast: %v", err)
+	}
+
+	// get the latest episode
+	epi, err := rssController.podController.FindLatestEpisode(context.Background(), *podID)
+	if err != nil {
+		t.Fatalf("Test_RSS() error finding latest episode: %v", err)
 	}
 
 	// delete the last episode to air
+	_, err = testDB.Exec(context.Background(),
+		`DELETE FROM Episodes
+		WHERE id=any(array(SELECT id FROM Episodes ORDER BY pub_date LIMIT 1))`)
+	if err != nil {
+		t.Fatalf("Test_RSS() error deleting latest episode %v", err)
+	}
 
-	// test update the podcast
+	// test update the podcast (adds the last episode)
+	err = rssController.UpdatePodcasts()
+	if err != nil {
+		t.Fatalf("Test_RSS() error updating podcasts: %v", err)
+	}
+
+	// find the latest, compare to previous latest
+	epi2, err := rssController.podController.FindLatestEpisode(context.Background(), *podID)
+	if err != nil {
+		t.Fatalf("Test_RSS() error finding latest episode(2): %v", err)
+	}
+	require.Equal(t, epi, epi2)
 }
 
 func Test_parseDuration(t *testing.T) {

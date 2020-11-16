@@ -40,7 +40,11 @@ func TestMain(m *testing.M) {
 	// run tests
 	runCode := m.Run()
 
-	db.Close()
+	testDB.Close()
 
 	os.Exit(runCode)
+}
+
+func setupPodcastDB() {
+
 }

@@ -102,17 +102,17 @@ func (c *RSSController) updatePodcast(pod *db.Podcast) error {
 
 // AddNewPodcast takes RSS url and downloads contents inserts the podcast and its episodes into the db
 // returns error if podcast already exists or connection error
-func (c *RSSController) AddNewPodcast(url string) error {
+func (c *RSSController) AddNewPodcast(url string) (*uuid.UUID, error) {
 	// check if podcast already contains that rss url
 	exists := c.podController.DoesPodcastExist(context.Background(), url)
 	if exists {
-		return errors.New("AddNewPodcast() podcast already exists")
+		return nil, errors.New("AddNewPodcast() podcast already exists")
 	}
 
 	// attempt to download & parse the podcast rss
 	rssResp, err := downloadRSS(url)
 	if err != nil {
-		return fmt.Errorf("AddNewPodcast() error downloading rss: %v", err)
+		return nil, fmt.Errorf("AddNewPodcast() error downloading rss: %v", err)
 	}
 	// defer closing
 	defer func() {
@@ -124,14 +124,14 @@ func (c *RSSController) AddNewPodcast(url string) error {
 
 	rssPod, err := parseRSS(rssResp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	pod := c.rssChannelToPodcast(&rssPod.Channel, uuid.New(), url)
 
 	// insert podcast
 	err = c.podController.InsertPodcast(context.Background(), pod)
 	if err != nil {
-		return fmt.Errorf("AddNewPodcast() error adding new podcast: %v", err)
+		return nil, fmt.Errorf("AddNewPodcast() error adding new podcast: %v", err)
 	}
 
 	// loop through episodes and save them
@@ -139,11 +139,11 @@ func (c *RSSController) AddNewPodcast(url string) error {
 		epi := rssItemToDBEpisode(&rssPod.Channel.Items[i], pod.ID)
 		err = c.podController.InsertEpisode(context.Background(), epi)
 		if err != nil {
-			fmt.Println("AddNewPodcast() couldn't insert episode: ", err)
+			log.Println("AddNewPodcast() couldn't insert episode: ", err)
 		}
 	}
 
-	return nil
+	return &pod.ID, nil
 }
 
 func downloadRSS(url string) (io.ReadCloser, error) {
@@ -334,18 +334,13 @@ func rssItemToDBEpisode(r *rssItem, podID uuid.UUID) *db.Episode {
 	if err != nil {
 		log.Println("rssItemToDBEpisode() error converting pubdate:", err)
 	}
-	duration, err := strconv.ParseInt(r.Duration, 10, 64)
+	duration, err := parseDuration(r.Duration)
 	if err != nil {
 		log.Println("rssItemToDBEpisode() error parsing duration:", err)
 	}
-	episode, err := strconv.Atoi(r.Episode)
-	if err != nil {
-		log.Println("rssItemToDBEpisode() error parsing episode #:", err)
-	}
-	season, err := strconv.Atoi(r.Season)
-	if err != nil {
-		log.Println("rssItemToDBEpisode() error parsing episode #:", err)
-	}
+	episode, _ := strconv.Atoi(r.Episode)
+	season, _ := strconv.Atoi(r.Season)
+
 	return &db.Episode{
 		ID:              uuid.New(),
 		Title:           r.Title,

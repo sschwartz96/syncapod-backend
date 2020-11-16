@@ -92,16 +92,6 @@ const (
 	ReadChange Scope = "ReadChange"
 )
 
-type PodcastStore interface {
-	// Podcast stuff
-	FindPodcastByRSS(ctx context.Context, rssURL string) (*Podcast, error)
-	FindPodcastsByRange(ctx context.Context, start, end int) (*[]Podcast, error)
-
-	// Episode stuff
-	FindEpisodeByTitle(ctx context.Context, podID uuid.UUID, title string) (*Episode, error)
-	FindEpisodeByURL(ctx context.Context, podID uuid.UUID, title string) (*Episode, error)
-}
-
 // Podcast contains information and xml struct tags for podcast
 type Podcast struct {
 	// REQUIRED

@@ -60,7 +60,7 @@ CREATE TABLE Podcasts (
 	rss_url TEXT NOT NULL
 );
 
-CREATE TABLE Episode (
+CREATE TABLE Episodes (
 	-- REQUIRED TAGS
 	id UUID PRIMARY KEY,
 	title TEXT NOT NULL,
@@ -86,7 +86,30 @@ CREATE TABLE Episode (
 );
 
 CREATE TABLE Categories (
-	id SERIAL,
+	id INTEGER PRIMARY KEY,
 	name TEXT NOT NULL,
 	parent_id INTEGER NOT NULL REFERENCES Categories(id) ON DELETE CASCADE
 );
+
+INSERT INTO Categories (id,name,parent_id) VALUES (0, 'nil', 0),
+	(1,'Arts', 0),(2,'Books', 1),(3,'Design', 1),(4,'Fashion & Beauty',1),(5,'Food',1),(6,'Performing Arts',1),(7,'Visual Arts',1),
+	(8,'Business',0),(9,'Careers',8),(10,'Entrepreneurship',8),(11,'Investing',8),(12,'Management',8),(13,'Marketing',8),(14,'Non-Profit',8),
+	(15,'Comedy', 0),(16,'Comedy Interviews',15),(17,'Improv',15),(18,'Stand-Up',15),
+	(19,'Education',0),(20,'Courses',19),(21,'How To',19),(22,'Language Learning',19),(23,'Self-Improvement',19),
+	(24,'Fiction',0),(25,'Comedy Fiction',24),(26,'Drama',24),(27,'Science Fiction',24),
+	(28,'Government',0),
+	(29,'History',0),
+	(30,'Health & Fitness',0),(31,'Alternative Health',30),(32,'Fitness',30),(33,'Medicine',30),(34,'Mental Health',30),(35,'Nutrition',30),(36,'Sexuality',30),
+	(37,'Kids & Family',0),(38,'Education for Kids',37),(39,'Parenting',37),(40,'Pets & Animals',37),(110,'Stories for Kids',37),
+	(41,'Leisure',0),(42,'Animation & Manga',41),(43,'Automotive',41),(44,'Aviation',41),(45,'Crafts',41),(46,'Games',41),(47,'Hobbies',41),(48,'Home & Garden',41),(49,'Video Games',41),
+	(50,'Music',0),(51,'Music Commentary',50),(52,'Music History',50),(53,'Music Interviews',50),
+	(54,'News',0),(55,'Business News',54),(56,'Daily News',54),(57,'Entertainment News',54),(58,'News Commentary',54),(59,'Politics',54),(60,'Sports News',54),(61,'Tech News',54),
+	(62,'Religion & Spirituality',0),(63,'Buddhism',62),(64,'Christianity',62),(65,'Hinduism',62),(66,'Islam',62),(67,'Judaism',62),(68,'Religion',62),(69,'Spirituality',62),
+	(70,'Science',0),(71,'Astronomy',70),(72,'Chemistry',70),(73,'Earth Sciences',70),(74,'Life Sciences',70),(75,'Mathematics',70),(76,'Natural Sciences',70),(77,'Nature',70),(78,'Physics',70),(79,'Social Sciences',70),
+	(80,'Society & Culture',0),(81,'Documentary',80),(82,'Personal Journals',80),(83,'Philosophy',80),(84,'Places & Travel',80),(85,'Relationships',80),
+	(86,'Sports',0),(87,'Baseball',86),(88,'Basketball',86),(89,'Cricket',86),(90,'Fantasy Sports',86),(91,'Football',86),(92,'Golf',86),(93,'Hockey',86),
+		(94,'Rugby',86),(95,'Running',86),(96,'Soccer',86),(97,'Swimming',86),(98,'Tennis',86),(99,'Volleyball',86),(100,'Wilderness',86),(101,'Wrestling',86),
+	(102,'Technology',0),
+	(103,'True Crime',0),
+	(104,'TV & Film',0),(105,'After Shows',104),(106,'Film History',104),(107,'Film Interviews',104),(108,'Film Reviews',104),(109,'TV Reviews',104)
+;
