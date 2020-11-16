@@ -40,6 +40,7 @@ func TestMain(m *testing.M) {
 
 	// setup db
 	setupAuthDB()
+	setupPodcastDB()
 
 	// run tests
 	runCode := m.Run()

@@ -3,6 +3,7 @@ package podcast
 import (
 	"errors"
 	"sort"
+	"sync"
 
 	"github.com/sschwartz96/syncapod-backend/internal/db"
 )
@@ -12,6 +13,7 @@ type CategoryCache struct {
 	dbCats []db.Category
 	// string represents category name
 	codes map[string]int
+	mutex sync.RWMutex
 }
 
 func NewCategoryCache(dbCats []db.Category) *CategoryCache {
@@ -27,6 +29,8 @@ func NewCategoryCache(dbCats []db.Category) *CategoryCache {
 // with their respective sub-categories, max recursive depth of Category is 2
 // parent categories MUST come before their children
 func (c *CategoryCache) LookupIDs(ids []int) ([]Category, error) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 	parentMap := map[int]*Category{}
 	// range all ids
 	for i := range ids {
@@ -58,6 +62,8 @@ func (c *CategoryCache) LookupIDs(ids []int) ([]Category, error) {
 // TranslateCategories recursively appends category ids into the ids slice.
 // Uses the codes maps held within the CategoryController
 func (c *CategoryCache) TranslateCategories(cats []Category, ids []int) []int {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 	if cats == nil {
 		return ids
 	}

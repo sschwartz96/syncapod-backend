@@ -87,9 +87,7 @@ func (c *RSSController) updatePodcast(pod *db.Podcast) error {
 	for e := range newPod.Channel.Items {
 		epi := rssItemToDBEpisode(&newPod.Channel.Items[e], pod.ID)
 		// check if the latest episode is in collection
-		exists := c.podController.DoesEpisodeExist(context.Background(),
-			pod.ID, epi.Title, epi.PubDate)
-		// episode does not exist
+		exists := c.podController.DoesEpisodeExist(context.Background(), pod.ID, epi.EnclosureURL)
 		if !exists {
 			err = c.podController.InsertEpisode(context.Background(), epi)
 			if err != nil {

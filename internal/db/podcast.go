@@ -3,8 +3,10 @@ package db
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -18,6 +20,19 @@ func NewPodcastStore(db *pgxpool.Pool) *PodcastStore {
 
 type scanner interface {
 	Scan(...interface{}) error
+}
+
+// scanPodcastRows is a helper method to scan mutiple rows in podcast slice
+func scanPodcastRows(rows pgx.Rows, p []Podcast) ([]Podcast, error) {
+	for rows.Next() {
+		temp := &Podcast{}
+		scanPodcastRow(rows, temp)
+		p = append(p, *temp)
+	}
+	if err := rows.Err(); err != nil {
+		return p, fmt.Errorf("FindPodcastsByRange() error while reading: %v", err)
+	}
+	return p, nil
 }
 
 // scanPodcastRow is a helper method to scan row into a podcast struct
@@ -40,6 +55,16 @@ func (ps *PodcastStore) InsertPodcast(ctx context.Context, p *Podcast) error {
 	return nil
 }
 
+func (ps *PodcastStore) FindPodcastByID(ctx context.Context, id uuid.UUID) (*Podcast, error) {
+	p := &Podcast{}
+	row := ps.db.QueryRow(ctx, "SELECT * FROM Podcasts WHERE id=$1", id)
+	err := scanPodcastRow(row, p)
+	if err != nil {
+		return nil, fmt.Errorf("FindPodcastByID() error: %v", err)
+	}
+	return p, nil
+}
+
 func (ps *PodcastStore) FindPodcastByRSS(ctx context.Context, rssURL string) (*Podcast, error) {
 	p := &Podcast{}
 	row := ps.db.QueryRow(ctx, "SELECT * FROM Podcasts WHERE rss_url=$1", rssURL)
@@ -53,20 +78,25 @@ func (ps *PodcastStore) FindPodcastByRSS(ctx context.Context, rssURL string) (*P
 func (ps *PodcastStore) FindPodcastsByRange(ctx context.Context, start int, end int) ([]Podcast, error) {
 	limit := end - start
 	offset := start
-	rows, err := ps.db.Query(ctx, "SELECT * FROM Podcast LIMIT $1 OFFSET $2", limit, offset)
+	rows, err := ps.db.Query(ctx, "SELECT * FROM Podcasts LIMIT $1 OFFSET $2", limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("FindPodcastsByRange() error: %v", err)
 	}
-	p := []Podcast{}
-	for rows.Next() {
-		temp := &Podcast{}
-		scanPodcastRow(rows, temp)
-		p = append(p, *temp)
+	return scanPodcastRows(rows, []Podcast{})
+}
+
+func (ps *PodcastStore) SearchPodcasts(ctx context.Context, search string) ([]Podcast, error) {
+	search = strings.ReplaceAll(search, " ", "&")
+	rows, err := ps.db.Query(ctx, `SELECT * FROM podcasts
+								   WHERE id IN (SELECT podcast_id
+									  FROM podcasts_search, to_tsquery($1) query
+									  WHERE search @@ query
+									  ORDER BY ts_rank(search,query)
+								   );`, &search)
+	if err != nil {
+		return nil, fmt.Errorf("SearchPodcasts() error on query: %v", err)
 	}
-	if err = rows.Err(); err != nil {
-		return p, fmt.Errorf("FindPodcastsByRange() error while reading: %v", err)
-	}
-	return p, nil
+	return scanPodcastRows(rows, []Podcast{})
 }
 
 // Episode stuff
@@ -91,12 +121,24 @@ func (p *PodcastStore) FindLatestEpisode(ctx context.Context, podID uuid.UUID) (
 	return epi, nil
 }
 
-func (p *PodcastStore) FindEpisodeByTitle(ctx context.Context, podID uuid.UUID, title string) (*Episode, error) {
-	panic("not implemented") // TODO: Implement
+func (p *PodcastStore) FindEpisodeNumber(ctx context.Context, podID uuid.UUID, season, episode int) (*Episode, error) {
+	row := p.db.QueryRow(ctx, "SELECT * FROM Episodes WHERE (podcast_id=$1 AND episode=$2)", &podID, &episode)
+	epi := &Episode{}
+	err := scanEpisodeRow(row, epi)
+	if err != nil {
+		return nil, fmt.Errorf("FindEpisodeNumber() error: %v", err)
+	}
+	return epi, nil
 }
 
-func (p *PodcastStore) FindEpisodeByURL(ctx context.Context, podID uuid.UUID, title string) (*Episode, error) {
-	panic("not implemented") // TODO: Implement
+func (p *PodcastStore) FindEpisodeByURL(ctx context.Context, podID uuid.UUID, mp3URL string) (*Episode, error) {
+	row := p.db.QueryRow(ctx, "SELECT * FROM Episodes WHERE (podcast_id=$1 AND enclosure_url=$2)", &podID, &mp3URL)
+	epi := &Episode{}
+	err := scanEpisodeRow(row, epi)
+	if err != nil {
+		return nil, fmt.Errorf("FindEpisodeByURL() error: %v", err)
+	}
+	return epi, nil
 }
 
 func (p *PodcastStore) FindAllCategories(ctx context.Context) ([]Category, error) {

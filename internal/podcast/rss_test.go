@@ -34,7 +34,7 @@ func Test_RSS(t *testing.T) {
 	// delete the last episode to air
 	_, err = testDB.Exec(context.Background(),
 		`DELETE FROM Episodes
-		WHERE id=any(array(SELECT id FROM Episodes ORDER BY pub_date LIMIT 1))`)
+		WHERE id=any(array(SELECT id FROM Episodes ORDER BY pub_date DESC LIMIT 1))`)
 	if err != nil {
 		t.Fatalf("Test_RSS() error deleting latest episode %v", err)
 	}
@@ -50,6 +50,7 @@ func Test_RSS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Test_RSS() error finding latest episode(2): %v", err)
 	}
+	epi2.ID = epi.ID
 	require.Equal(t, epi, epi2)
 }
 

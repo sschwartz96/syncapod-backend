@@ -78,11 +78,11 @@ CREATE TABLE Episodes (
 	episode INT,
 	season INT,
 	episode_type TEXT, -- Full, Trailer, Bonus
---	block BOOLEAN,
+	--	block BOOLEAN,
 	-- OTHER
 	summary TEXT,
 	encoded TEXT,
-	podcast_id UUID  NOT NULL REFERENCES Podcasts(id) ON DELETE CASCADE
+	podcast_id UUID NOT NULL REFERENCES Podcasts(id) ON DELETE CASCADE
 );
 
 CREATE TABLE Categories (
@@ -113,3 +113,28 @@ INSERT INTO Categories (id,name,parent_id) VALUES (0, 'nil', 0),
 	(103,'True Crime',0),
 	(104,'TV & Film',0),(105,'After Shows',104),(106,'Film History',104),(107,'Film Interviews',104),(108,'Film Reviews',104),(109,'TV Reviews',104)
 ;
+
+-- SEARCH
+CREATE TABLE podcasts_search (
+	id SERIAL PRIMARY KEY,
+	podcast_id UUID NOT NULL REFERENCES Podcasts(id) ON DELETE CASCADE,
+	search tsvector
+);
+
+CREATE FUNCTION podcasts_search_trigger() RETURNS trigger AS $$
+BEGIN
+		INSERT INTO podcasts_search(podcast_id,search) VALUES(NEW.id,
+			setweight(to_tsvector('english',coalesce(NEW.title,'')), 'A') ||
+			setweight(to_tsvector('english',coalesce(NEW.keywords,'')), 'A') ||
+			setweight(to_tsvector('english',coalesce(NEW.author,'')), 'B') ||
+			setweight(to_tsvector('english',coalesce(NEW.description,'')), 'C') ||
+			setweight(to_tsvector('english',coalesce(NEW.summary,'')), 'C')
+		);
+	return NEW;
+END
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER podcasts_search_trigger AFTER INSERT OR UPDATE ON podcasts
+	FOR EACH ROW EXECUTE FUNCTION podcasts_search_trigger();
+
+CREATE INDEX weighted_pod_idx ON podcasts_search USING GIN (search);
