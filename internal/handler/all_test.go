@@ -34,7 +34,7 @@ func TestMain(t *testing.M) {
 	}
 
 	// create controllers
-	authC := auth.CreateAuthController(db.NewAuthStorePG(pg), db.NewOAuthStorePG(pg))
+	authC := auth.NewAuthController(db.NewAuthStorePG(pg), db.NewOAuthStorePG(pg))
 
 	// create handlers
 	oauthHandler, err := createTestOAuthHandler(authC)

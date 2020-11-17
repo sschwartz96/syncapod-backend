@@ -92,20 +92,20 @@ CREATE TABLE Categories (
 );
 
 CREATE TABLE Subscriptions (
-	id UUID PRIMARY KEY,
 	user_id UUID REFERENCES Users(id) ON DELETE CASCADE,
 	podcast_id UUID REFERENCES Podcasts(id) ON DELETE CASCADE,
 	completed_ids UUID[],
-	in_progress_ids UUID[]
+	in_progress_ids UUID[],
+	PRIMARY KEY(user_id,podcast_id)
 );
 
 CREATE TABLE UserEpisodes (
-	id UUID PRIMARY KEY, 
 	user_id UUID NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
 	episode_id UUID NOT NULL REFERENCES Episodes(id) ON DELETE CASCADE,
 	offset_millis BIGINT,
 	last_seen TIMESTAMPTZ,
-	played BOOLEAN
+	played BOOLEAN,
+	PRIMARY KEY(user_id,episode_id)
 );
 
 INSERT INTO Categories (id,name,parent_id) VALUES (0, 'nil', 0),

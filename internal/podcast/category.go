@@ -16,7 +16,7 @@ type CategoryCache struct {
 	mutex sync.RWMutex
 }
 
-func NewCategoryCache(dbCats []db.Category) *CategoryCache {
+func newCategoryCache(dbCats []db.Category) *CategoryCache {
 	con := CategoryCache{dbCats: make([]db.Category, 0), codes: make(map[string]int)}
 	con.dbCats = append(con.dbCats, dbCats...)
 	for i := range dbCats {

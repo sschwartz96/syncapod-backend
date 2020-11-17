@@ -14,7 +14,7 @@ var (
 	testPod     = &Podcast{ID: uuid.New(), Author: "Sam Schwartz", Description: "Syncapod Podcast", LinkURL: "https://syncapod.com/podcast", ImageURL: "http://syncapod.com/logo.png", Language: "en", Category: []int{1, 2, 3}, Explicit: "clean", RSSURL: "https://syncapod.com/podcast.rss"}
 	testEpi     = &Episode{ID: uuid.New(), PodcastID: testPod.ID, Title: "Test Episode", Episode: 123}
 	testUser    = &UserRow{ID: uuid.New(), Username: "dbTestUser", PasswordHash: []byte("shouldbehash")}
-	testUserEpi = &UserEpisode{ID: uuid.New(), EpisodeID: testEpi.ID, UserID: testUser.ID, LastSeen: time.Now(), OffsetMillis: 123456, Played: false}
+	testUserEpi = &UserEpisode{EpisodeID: testEpi.ID, UserID: testUser.ID, LastSeen: time.Now(), OffsetMillis: 123456, Played: false}
 )
 
 func setupPodcastDB() {
@@ -83,6 +83,15 @@ func Test_FindLatestEpisode(t *testing.T) {
 	require.Equal(t, testEpi.ID, epi.ID)
 }
 
+func Test_FindEpisodeByID(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	epi, err := podStore.FindEpisodeByID(context.Background(), testEpi.ID)
+	if err != nil {
+		t.Fatalf("Test_FindEpisodeByID() error: %v", err)
+	}
+	require.Equal(t, testEpi.ID, epi.ID)
+}
+
 func Test_FindEpisodeByURL(t *testing.T) {
 	podStore := NewPodcastStore(testDB)
 	epi, err := podStore.FindEpisodeByURL(context.Background(), testPod.ID, testEpi.EnclosureURL)
@@ -134,7 +143,27 @@ func Test_FindUserEpisode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Test_FindUserEpisode() error: %v", err)
 	}
-	require.NotEmpty(t, userEpi.ID.String())
+	require.NotNil(t, userEpi)
+}
+
+func Test_FindLastUserEpi(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	userEpi, err := podStore.FindLastUserEpi(context.Background(), testUser.ID)
+	if err != nil {
+		t.Fatalf("Test_FindLastUserEpi() error: %v", err)
+	}
+	require.NotNil(t, userEpi)
+}
+
+func Test_FindLastUserPlayed(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	userEpi, pod, epi, err := podStore.FindLastPlayed(context.Background(), testUser.ID)
+	if err != nil {
+		t.Fatalf("Test_FindLastUserEpiWithEpisode() error: %v", err)
+	}
+	require.NotEmpty(t, userEpi)
+	require.NotEmpty(t, epi)
+	require.NotEmpty(t, pod)
 }
 
 func Test_UpsertUserEpisode(t *testing.T) {

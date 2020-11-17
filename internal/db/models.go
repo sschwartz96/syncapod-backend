@@ -152,7 +152,6 @@ type Category struct {
 }
 
 type Subscription struct {
-	ID            uuid.UUID
 	UserID        uuid.UUID
 	PodcastID     uuid.UUID
 	CompletedIDs  []uuid.UUID
@@ -160,7 +159,6 @@ type Subscription struct {
 }
 
 type UserEpisode struct {
-	ID           uuid.UUID
 	UserID       uuid.UUID
 	EpisodeID    uuid.UUID
 	OffsetMillis int64

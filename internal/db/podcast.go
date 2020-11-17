@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
@@ -111,6 +112,16 @@ func (p *PodcastStore) InsertEpisode(ctx context.Context, e *Episode) error {
 	return nil
 }
 
+func (p *PodcastStore) FindEpisodeByID(ctx context.Context, epiID uuid.UUID) (*Episode, error) {
+	row := p.db.QueryRow(ctx, "SELECT * FROM Episodes WHERE id=$1", &epiID)
+	epi := &Episode{}
+	err := scanEpisodeRow(row, epi)
+	if err != nil {
+		return nil, fmt.Errorf("FindEpisodeByID() error: %v", err)
+	}
+	return epi, nil
+}
+
 func (p *PodcastStore) FindLatestEpisode(ctx context.Context, podID uuid.UUID) (*Episode, error) {
 	row := p.db.QueryRow(ctx, "SELECT * FROM Episodes WHERE podcast_id=$1 ORDER BY pub_date DESC", &podID)
 	epi := &Episode{}
@@ -164,11 +175,11 @@ func (p *PodcastStore) FindAllCategories(ctx context.Context) ([]Category, error
 func (p *PodcastStore) UpsertUserEpisode(ctx context.Context, userEpi *UserEpisode) error {
 	_, err := p.db.Exec(ctx,
 		`INSERT INTO UserEpisodes
-		(id,user_id,episode_id,offset_millis,last_seen,played)
-		VALUES($1,$2,$3,$4,$5,$6)
-		ON CONFLICT(id)
+		(user_id,episode_id,offset_millis,last_seen,played)
+		VALUES($1,$2,$3,$4,$5)
+		ON CONFLICT(user_id,episode_id)
 		DO UPDATE SET offset_millis=EXCLUDED.offset_millis,last_seen=EXCLUDED.last_seen,played=EXCLUDED.played`,
-		&userEpi.ID, &userEpi.UserID, &userEpi.EpisodeID, &userEpi.OffsetMillis, &userEpi.LastSeen, &userEpi.Played,
+		&userEpi.UserID, &userEpi.EpisodeID, &userEpi.OffsetMillis, &userEpi.LastSeen, &userEpi.Played,
 	)
 	if err != nil {
 		return fmt.Errorf("UpsertUserEpisode() error: %v", err)
@@ -177,13 +188,47 @@ func (p *PodcastStore) UpsertUserEpisode(ctx context.Context, userEpi *UserEpiso
 }
 
 func (p *PodcastStore) FindUserEpisode(ctx context.Context, userID, epiID uuid.UUID) (*UserEpisode, error) {
-	userEpi := &UserEpisode{UserID: userID, EpisodeID: epiID}
+	userEpi := &UserEpisode{UserID: userID, EpisodeID: epiID, LastSeen: time.Now()}
 	row := p.db.QueryRow(ctx,
-		"SELECT id,offset_millis,last_seen,played FROM UserEpisodes WHERE (user_id=$1 AND episode_id=$2)",
+		"SELECT offset_millis,last_seen,played FROM UserEpisodes WHERE (user_id=$1 AND episode_id=$2)",
 		&userID, &epiID)
-	err := row.Scan(&userEpi.ID, &userEpi.OffsetMillis, &userEpi.LastSeen, &userEpi.Played)
+	err := row.Scan(&userEpi.OffsetMillis, &userEpi.LastSeen, &userEpi.Played)
 	if err != nil {
 		return nil, fmt.Errorf("FindUserEpisode() error: %v", err)
 	}
 	return userEpi, nil
+}
+
+func (p *PodcastStore) FindLastUserEpi(ctx context.Context, userID uuid.UUID) (*UserEpisode, error) {
+	userEpi := &UserEpisode{UserID: userID}
+	row := p.db.QueryRow(ctx,
+		"SELECT episode_id,offset_millis,last_seen,played FROM UserEpisodes WHERE user_id=$1 ORDER BY last_seen DESC",
+		&userID)
+	err := row.Scan(&userEpi.EpisodeID, &userEpi.OffsetMillis, &userEpi.LastSeen, &userEpi.Played)
+	if err != nil {
+		return nil, fmt.Errorf("FindLastUserEpi() error: %v", err)
+	}
+	return userEpi, nil
+}
+
+func (ps *PodcastStore) FindLastPlayed(ctx context.Context, userID uuid.UUID) (*UserEpisode, *Podcast, *Episode, error) {
+	userEpi := &UserEpisode{UserID: userID}
+	e := &Episode{}
+	p := &Podcast{}
+	row := ps.db.QueryRow(ctx,
+		`SELECT * FROM UserEpisodes u 
+		 INNER JOIN Episodes e ON u.episode_id=e.id
+		 INNER JOIN Podcasts p ON e.podcast_id=p.id
+		 WHERE u.user_id=$1 ORDER BY u.last_seen DESC`,
+		&userID)
+	err := row.Scan(&userEpi.UserID, &userEpi.EpisodeID, &userEpi.OffsetMillis, &userEpi.LastSeen, &userEpi.Played,
+		&e.ID, &e.Title, &e.EnclosureURL, &e.EnclosureLength, &e.EnclosureType, &e.PubDate, &e.Description, &e.Duration, &e.LinkURL,
+		&e.ImageURL, &e.Explicit, &e.Episode, &e.Season, &e.EpisodeType, &e.Summary, &e.Encoded, &e.PodcastID,
+		&p.ID, &p.Title, &p.Description, &p.ImageURL, &p.Language, &p.Category, &p.Explicit, &p.Author, &p.LinkURL,
+		&p.OwnerName, &p.OwnerEmail, &p.Episodic, &p.Copyright, &p.Block, &p.Complete, &p.PubDate, &p.Keywords, &p.Summary, &p.RSSURL,
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("FindLastUserEpi() error: %v", err)
+	}
+	return userEpi, p, e, nil
 }
