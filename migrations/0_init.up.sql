@@ -101,10 +101,10 @@ CREATE TABLE Subscriptions (
 
 CREATE TABLE UserEpisodes (
 	id UUID PRIMARY KEY, 
-	user_id UUID REFERENCES Users(id) ON DELETE CASCADE,
-	episode_id UUID REFERENCES Episodes(id) ON DELETE CASCADE,
-	offset BIGINT,
-	lastSeen TIMESTAMPTZ,
+	user_id UUID NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+	episode_id UUID NOT NULL REFERENCES Episodes(id) ON DELETE CASCADE,
+	offset_millis BIGINT,
+	last_seen TIMESTAMPTZ,
 	played BOOLEAN
 );
 

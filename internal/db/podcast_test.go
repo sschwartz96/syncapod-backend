@@ -14,7 +14,7 @@ var (
 	testPod     = &Podcast{ID: uuid.New(), Author: "Sam Schwartz", Description: "Syncapod Podcast", LinkURL: "https://syncapod.com/podcast", ImageURL: "http://syncapod.com/logo.png", Language: "en", Category: []int{1, 2, 3}, Explicit: "clean", RSSURL: "https://syncapod.com/podcast.rss"}
 	testEpi     = &Episode{ID: uuid.New(), PodcastID: testPod.ID, Title: "Test Episode", Episode: 123}
 	testUser    = &UserRow{ID: uuid.New(), Username: "dbTestUser", PasswordHash: []byte("shouldbehash")}
-	testUserEpi = &UserEpisode{ID: uuid.New(), EpisodeID: testEpi.ID, UserID: testUser.ID, LastSeen: time.Now(), Offset: 123456, Played: false}
+	testUserEpi = &UserEpisode{ID: uuid.New(), EpisodeID: testEpi.ID, UserID: testUser.ID, LastSeen: time.Now(), OffsetMillis: 123456, Played: false}
 )
 
 func setupPodcastDB() {
@@ -38,6 +38,33 @@ func setupPodcastDB() {
 	}
 }
 
+func Test_FindPodcast(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	pod, err := podStore.FindPodcastByID(context.Background(), testPod.ID)
+	if err != nil {
+		t.Fatalf("Test_FindPodcast() error: %v", err)
+	}
+	require.Equal(t, testPod.ID, pod.ID)
+}
+
+func Test_FindPodcastByRSS(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	pod, err := podStore.FindPodcastByRSS(context.Background(), testPod.RSSURL)
+	if err != nil {
+		t.Fatalf("Test_FindPodcastRSS() error: %v", err)
+	}
+	require.Equal(t, testPod.ID, pod.ID)
+}
+
+func Test_FindPodcastsByRange(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	pods, err := podStore.FindPodcastsByRange(context.Background(), 0, 1)
+	if err != nil {
+		t.Fatalf("Test_FindPodcastRSS() error: %v", err)
+	}
+	require.NotEmpty(t, pods)
+}
+
 func Test_InsertPodcast(t *testing.T) {
 	podStore := NewPodcastStore(testDB)
 	pod := &Podcast{ID: uuid.New(), Author: "Sam Schwartz", Description: "Test Insert Podcast", LinkURL: "https://syncapod.com/podcast", ImageURL: "http://syncapod.com/logo.png", Language: "en", Category: []int{1, 2, 3}, Explicit: "clean", RSSURL: "https://syncapod.com/podcast_test.rss"}
@@ -45,6 +72,24 @@ func Test_InsertPodcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Test_InsertPodcast() error: %v", err)
 	}
+}
+
+func Test_FindLatestEpisode(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	epi, err := podStore.FindLatestEpisode(context.Background(), testPod.ID)
+	if err != nil {
+		t.Fatalf("Test_FindLatestEpisode() error: %v", err)
+	}
+	require.Equal(t, testEpi.ID, epi.ID)
+}
+
+func Test_FindEpisodeByURL(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	epi, err := podStore.FindEpisodeByURL(context.Background(), testPod.ID, testEpi.EnclosureURL)
+	if err != nil {
+		t.Fatalf("Test_FindEpisodeByURL() error: %v", err)
+	}
+	require.Equal(t, testEpi.ID, epi.ID)
 }
 
 func Test_FindEpisodeNumber(t *testing.T) {
@@ -74,6 +119,15 @@ func Test_SearchPodcasts(t *testing.T) {
 	require.Equal(t, pods[0].ID, pod.ID)
 }
 
+func Test_FindAllCategories(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	cats, err := podStore.FindAllCategories(context.Background())
+	if err != nil {
+		t.Fatalf("Test_FindEpisodeByURL() error: %v", err)
+	}
+	require.NotEmpty(t, cats)
+}
+
 func Test_FindUserEpisode(t *testing.T) {
 	podStore := NewPodcastStore(testDB)
 	userEpi, err := podStore.FindUserEpisode(context.Background(), testUser.ID, testEpi.ID)
@@ -86,7 +140,7 @@ func Test_FindUserEpisode(t *testing.T) {
 func Test_UpsertUserEpisode(t *testing.T) {
 	podStore := NewPodcastStore(testDB)
 	upsertUserEpi := *testUserEpi
-	upsertUserEpi.Offset = 654321
+	upsertUserEpi.OffsetMillis = 654321
 	err := podStore.UpsertUserEpisode(context.Background(), &upsertUserEpi)
 	if err != nil {
 		t.Fatalf("Test_UpsertUserEpisode() error: %v", err)
@@ -95,5 +149,5 @@ func Test_UpsertUserEpisode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Test_UpsertUserEpisode() error finding user epi: %v", err)
 	}
-	require.Equal(t, upsertUserEpi, upsertUserEpi2)
+	require.Equal(t, upsertUserEpi.OffsetMillis, upsertUserEpi2.OffsetMillis)
 }

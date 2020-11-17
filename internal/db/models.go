@@ -160,10 +160,10 @@ type Subscription struct {
 }
 
 type UserEpisode struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	EpisodeID uuid.UUID
-	Offset    int64
-	LastSeen  time.Time
-	Played    bool
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	EpisodeID    uuid.UUID
+	OffsetMillis int64
+	LastSeen     time.Time
+	Played       bool
 }

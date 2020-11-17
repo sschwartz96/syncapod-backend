@@ -164,10 +164,11 @@ func (p *PodcastStore) FindAllCategories(ctx context.Context) ([]Category, error
 func (p *PodcastStore) UpsertUserEpisode(ctx context.Context, userEpi *UserEpisode) error {
 	_, err := p.db.Exec(ctx,
 		`INSERT INTO UserEpisodes
-		(id,user_id,episode_id,offset,last_seen,played)
+		(id,user_id,episode_id,offset_millis,last_seen,played)
 		VALUES($1,$2,$3,$4,$5,$6)
 		ON CONFLICT(id)
-		DO UPDATE SET offset=EXCLUDED.offset,last_seen=EXCLUDED.last_seen,played=EXCLUDED.played`,
+		DO UPDATE SET offset_millis=EXCLUDED.offset_millis,last_seen=EXCLUDED.last_seen,played=EXCLUDED.played`,
+		&userEpi.ID, &userEpi.UserID, &userEpi.EpisodeID, &userEpi.OffsetMillis, &userEpi.LastSeen, &userEpi.Played,
 	)
 	if err != nil {
 		return fmt.Errorf("UpsertUserEpisode() error: %v", err)
@@ -177,9 +178,10 @@ func (p *PodcastStore) UpsertUserEpisode(ctx context.Context, userEpi *UserEpiso
 
 func (p *PodcastStore) FindUserEpisode(ctx context.Context, userID, epiID uuid.UUID) (*UserEpisode, error) {
 	userEpi := &UserEpisode{UserID: userID, EpisodeID: epiID}
-	err := p.db.QueryRow(ctx, "SELECT (id,offset,last_seen,played) FROM UserEpisodes WHERE user_id=$1,episode_id=$2", userID, epiID).Scan(
-		&userEpi.ID, &userEpi.Offset, &userEpi.LastSeen, &userEpi.Played,
-	)
+	row := p.db.QueryRow(ctx,
+		"SELECT id,offset_millis,last_seen,played FROM UserEpisodes WHERE (user_id=$1 AND episode_id=$2)",
+		&userID, &epiID)
+	err := row.Scan(&userEpi.ID, &userEpi.OffsetMillis, &userEpi.LastSeen, &userEpi.Played)
 	if err != nil {
 		return nil, fmt.Errorf("FindUserEpisode() error: %v", err)
 	}
