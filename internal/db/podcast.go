@@ -149,11 +149,39 @@ func (p *PodcastStore) FindAllCategories(ctx context.Context) ([]Category, error
 	}
 	for rows.Next() {
 		temp := Category{}
-		rows.Scan(&temp.ID, &temp.Name, &temp.ParentID)
+		err := rows.Scan(&temp.ID, &temp.Name, &temp.ParentID)
+		if err != nil {
+			return nil, fmt.Errorf("FindAllCategories() error scanning row: %v", err)
+		}
 		cats = append(cats, temp)
 	}
 	if err = rows.Err(); err != nil {
 		return cats, fmt.Errorf("FindAllCategories() error reading rows: %v", err)
 	}
 	return cats, nil
+}
+
+func (p *PodcastStore) UpsertUserEpisode(ctx context.Context, userEpi *UserEpisode) error {
+	_, err := p.db.Exec(ctx,
+		`INSERT INTO UserEpisodes
+		(id,user_id,episode_id,offset,last_seen,played)
+		VALUES($1,$2,$3,$4,$5,$6)
+		ON CONFLICT(id)
+		DO UPDATE SET offset=EXCLUDED.offset,last_seen=EXCLUDED.last_seen,played=EXCLUDED.played`,
+	)
+	if err != nil {
+		return fmt.Errorf("UpsertUserEpisode() error: %v", err)
+	}
+	return nil
+}
+
+func (p *PodcastStore) FindUserEpisode(ctx context.Context, userID, epiID uuid.UUID) (*UserEpisode, error) {
+	userEpi := &UserEpisode{UserID: userID, EpisodeID: epiID}
+	err := p.db.QueryRow(ctx, "SELECT (id,offset,last_seen,played) FROM UserEpisodes WHERE user_id=$1,episode_id=$2", userID, epiID).Scan(
+		&userEpi.ID, &userEpi.Offset, &userEpi.LastSeen, &userEpi.Played,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("FindUserEpisode() error: %v", err)
+	}
+	return userEpi, nil
 }

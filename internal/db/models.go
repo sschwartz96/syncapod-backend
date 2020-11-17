@@ -150,3 +150,20 @@ type Category struct {
 	Name     string
 	ParentID int
 }
+
+type Subscription struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	PodcastID     uuid.UUID
+	CompletedIDs  []uuid.UUID
+	InProgressIDs []uuid.UUID
+}
+
+type UserEpisode struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	EpisodeID uuid.UUID
+	Offset    int64
+	LastSeen  time.Time
+	Played    bool
+}

@@ -91,6 +91,23 @@ CREATE TABLE Categories (
 	parent_id INTEGER NOT NULL REFERENCES Categories(id) ON DELETE CASCADE
 );
 
+CREATE TABLE Subscriptions (
+	id UUID PRIMARY KEY,
+	user_id UUID REFERENCES Users(id) ON DELETE CASCADE,
+	podcast_id UUID REFERENCES Podcasts(id) ON DELETE CASCADE,
+	completed_ids UUID[],
+	in_progress_ids UUID[]
+);
+
+CREATE TABLE UserEpisodes (
+	id UUID PRIMARY KEY, 
+	user_id UUID REFERENCES Users(id) ON DELETE CASCADE,
+	episode_id UUID REFERENCES Episodes(id) ON DELETE CASCADE,
+	offset BIGINT,
+	lastSeen TIMESTAMPTZ,
+	played BOOLEAN
+);
+
 INSERT INTO Categories (id,name,parent_id) VALUES (0, 'nil', 0),
 	(1,'Arts', 0),(2,'Books', 1),(3,'Design', 1),(4,'Fashion & Beauty',1),(5,'Food',1),(6,'Performing Arts',1),(7,'Visual Arts',1),
 	(8,'Business',0),(9,'Careers',8),(10,'Entrepreneurship',8),(11,'Investing',8),(12,'Management',8),(13,'Marketing',8),(14,'Non-Profit',8),
