@@ -1,8 +1,11 @@
-version "3.8"
+version: '3'
+
 services:
     syncapod:
-        context: .
-        target: dev
+        build: .
+        command: go run cmd/main.go
+        volumes:
+            syncapod-code:/code
         networks:
             - backend
         ports:
@@ -23,7 +26,7 @@ services:
 
 volumes:
     pg-data:
-    syncapod-code:
+        syncapod-code:
 
 networks:
     backend:

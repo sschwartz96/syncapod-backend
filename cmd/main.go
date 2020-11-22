@@ -25,11 +25,17 @@ func main() {
 		log.Fatal("Main() error, could not read config: ", err)
 	}
 
-	log.Println("Running syncapod version: ", cfg.Version)
+	log.Println("Running syncapod")
+
+	// setup context
+	ctx, cncFn := context.WithTimeout(context.Background(), time.Second*5)
+	defer cncFn()
 
 	// connect to db
 	log.Println("connecting to db")
-	pgdb, err := pgxpool.Connect(context.Background(), cfg.DbURI)
+	pgdb, err := pgxpool.Connect(ctx,
+		fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/%s", cfg.DbUser, cfg.DbPass, cfg.DbPort, cfg.DbName),
+	)
 	if err != nil {
 		log.Fatal("couldn't connect to db: ", err)
 	}
