@@ -1,8 +1,10 @@
-version "3.8"
+version: "3.8"
+
 services:
     syncapod:
         context: .
         target: dev
+        restart: always
         networks:
             - backend
         ports:
@@ -10,8 +12,10 @@ services:
             - "443:443"
         depends_on:
             - db
+
     db:
         image: postgresql
+        restart: always
         environment:
             - POSTGRES_DB=syncapod
             - POSTGRES_USER=syncapod
