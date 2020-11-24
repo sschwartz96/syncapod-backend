@@ -3,7 +3,7 @@ version: "3.8"
 services:
     syncapod:
         context: .
-        target: dev
+        target: prod
         restart: always
         networks:
             - backend

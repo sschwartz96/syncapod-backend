@@ -25,11 +25,11 @@ type Config struct {
 	DbPort        int    `json:"db_port"`           // env:PG_PORT
 	DbName        string `json:"db_name"`           // env:PG_DB_NAME
 	Port          int    `json:"port"`
-	CertFile      string `json:"cert_file"`
-	KeyFile       string `json:"key_file"`
 	AlexaClientID string `json:"alexa_client_id"`
 	AlexaSecret   string `json:"alexa_secret"`
 	GRPCPort      int    `json:"grpc_port"`
+	Production    bool   `json:"production"`
+	CertDir       string `json:"cert_dir"` // only used if production=true
 }
 
 // ReadConfig reads the config file encoded in JSON
