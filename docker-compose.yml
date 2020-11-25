@@ -2,8 +2,9 @@ version: "3.8"
 
 services:
     syncapod:
-        context: .
-        target: prod
+        build:
+            context: .
+            target: prod
         restart: always
         networks:
             - backend
@@ -14,12 +15,12 @@ services:
             - db
 
     db:
-        image: postgresql
+        image: postgres:latest
         restart: always
         environment:
             - POSTGRES_DB=syncapod
             - POSTGRES_USER=syncapod
-            - POSTGRE_PASSWORD=${db_pass}
+            - POSTGRES_PASSWORD=${db_pass}
         volumes:
             - pg-data:/var/lib/postgresql/data
         networks:
@@ -31,3 +32,5 @@ volumes:
 
 networks:
     backend:
+        driver: bridge
+        name: backend

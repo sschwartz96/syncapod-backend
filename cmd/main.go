@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -35,9 +36,11 @@ func main() {
 
 	// connect to db
 	log.Println("connecting to db")
-	pgdb, err := pgxpool.Connect(ctx,
-		fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/%s", cfg.DbUser, cfg.DbPass, cfg.DbPort, cfg.DbName),
-	)
+
+	pgURI := fmt.Sprintf("postgresql://%s:%s@backend:%d/%s",
+		cfg.DbUser, url.QueryEscape(cfg.DbPass), cfg.DbPort, cfg.DbName)
+	log.Println("pgURI:", pgURI)
+	pgdb, err := pgxpool.Connect(ctx, pgURI)
 	if err != nil {
 		log.Fatal("couldn't connect to db: ", err)
 	}
