@@ -8,8 +8,6 @@ services:
             - POSTGRES_DB=syncapod
             - POSTGRES_USER=syncapod
             - POSTGRES_PASSWORD=${db_pass}
-        ports:
-            - "5432:5432"
         volumes:
             - pg-data:/var/lib/postgresql/data
         networks:
@@ -20,6 +18,8 @@ services:
             context: .
             target: prod
         restart: always
+        volumes:
+            - syncapod-data:/syncapod
         networks:
             - backend
         ports:
@@ -30,7 +30,7 @@ services:
 
 volumes:
     pg-data:
-    syncapod-code:
+    syncapod-data:
 
 networks:
     backend:
