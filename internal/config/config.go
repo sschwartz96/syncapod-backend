@@ -11,19 +11,22 @@ import (
 
 // Defaults
 const (
-	dbuserDefault   = "syncapod"
-	dbportDefault   = 5432
-	dbnameDefault   = "syncapod"
-	portDefault     = 3030
-	grpcPortDefault = 50051
+	dbuserDefault        = "syncapod"
+	dbportDefault        = 5432
+	dbnameDefault        = "syncapod"
+	migrationsDirDefault = "/syncapod/migrations"
+	portDefault          = 3030
+	grpcPortDefault      = 50051
 )
 
 // Config holds variables for our server
 type Config struct {
 	DbUser        string `json:"db_user,omitempty"` // env:PG_USER
 	DbPass        string `json:"db_pass,omitempty"` // env:PG_PASS
-	DbPort        int    `json:"db_port"`           // env:PG_PORT
-	DbName        string `json:"db_name"`           // env:PG_DB_NAME
+	DbHost        string `json:"db_host"`
+	DbPort        int    `json:"db_port"` // env:PG_PORT
+	DbName        string `json:"db_name"` // env:PG_DB_NAME
+	MigrationsDir string `json:"migrations_dir"`
 	Port          int    `json:"port"`
 	AlexaClientID string `json:"alexa_client_id"`
 	AlexaSecret   string `json:"alexa_secret"`
@@ -35,11 +38,12 @@ type Config struct {
 // ReadConfig reads the config file encoded in JSON
 func ReadConfig(r io.Reader) (*Config, error) {
 	config := &Config{
-		DbUser:   dbuserDefault,
-		DbPort:   dbportDefault,
-		DbName:   dbnameDefault,
-		Port:     portDefault,
-		GRPCPort: grpcPortDefault,
+		DbUser:        dbuserDefault,
+		DbPort:        dbportDefault,
+		DbName:        dbnameDefault,
+		MigrationsDir: migrationsDirDefault,
+		Port:          portDefault,
+		GRPCPort:      grpcPortDefault,
 	}
 	// Unmarshal into config var
 	err := json.NewDecoder(r).Decode(config)

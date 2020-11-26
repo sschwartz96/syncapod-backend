@@ -9,6 +9,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/sschwartz96/syncapod-backend/internal/auth"
 	"github.com/sschwartz96/syncapod-backend/internal/config"
@@ -37,12 +40,22 @@ func main() {
 	// connect to db
 	log.Println("connecting to db")
 
-	pgURI := fmt.Sprintf("postgresql://%s:%s@backend:%d/%s",
-		cfg.DbUser, url.QueryEscape(cfg.DbPass), cfg.DbPort, cfg.DbName)
+	pgURI := fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=disable",
+		cfg.DbUser, url.QueryEscape(cfg.DbPass), cfg.DbHost, cfg.DbPort, cfg.DbName)
 	log.Println("pgURI:", pgURI)
 	pgdb, err := pgxpool.Connect(ctx, pgURI)
 	if err != nil {
-		log.Fatal("couldn't connect to db: ", err)
+		log.Fatalf("couldn't connect to db: %v", err)
+	}
+
+	// run migrations
+	mig, err := migrate.New("file://"+cfg.MigrationsDir, pgURI)
+	if err != nil {
+		log.Fatalf("couldn't create migrate struct : %v", err)
+	}
+	err = mig.Up()
+	if err != nil && err.Error() != "no change" {
+		log.Fatalf("couldn't run migrations: %v", err)
 	}
 
 	// setup stores

@@ -9,4 +9,6 @@ FROM alpine:latest AS prod
 WORKDIR /syncapod
 COPY --from=0 /app/main /syncapod
 COPY ./config.json /syncapod
+COPY ./migrations /syncapod/migrations
+COPY ./templates /syncapod/templates
 CMD ["/syncapod/main"]
