@@ -20,14 +20,15 @@ const mockConfig = `{
 }`
 
 var mockConfigObj = &Config{
-	CertDir:    "/syncapod/cert",
-	Port:       8090,
-	GRPCPort:   50051,
-	DbName:     "syncapod",
-	DbUser:     "syncapod",
-	DbPass:     "syncapod",
-	DbPort:     5432,
-	Production: false,
+	CertDir:       "/syncapod/cert",
+	Port:          8090,
+	GRPCPort:      50051,
+	DbName:        "syncapod",
+	DbUser:        "syncapod",
+	DbPass:        "syncapod",
+	DbPort:        5432,
+	Production:    false,
+	MigrationsDir: "/syncapod/migrations",
 }
 
 func TestReadConfig(t *testing.T) {

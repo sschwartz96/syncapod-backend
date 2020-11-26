@@ -1,11 +1,13 @@
-FROM golang:alpine
+FROM golang:alpine AS build
 RUN mkdir /app
-COPY . /app
 WORKDIR /app
+# Dependency management
+COPY go.* /app/
+RUN go mod download
+COPY . /app
 RUN go build -o /app/main cmd/main.go
 
 FROM alpine:latest AS prod
-# RUN apk --no-cache add ca-certificates
 WORKDIR /syncapod
 COPY --from=0 /app/main /syncapod
 COPY ./config.json /syncapod
