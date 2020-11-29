@@ -2,33 +2,65 @@ package grpc
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"net"
+	"os"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/sschwartz96/stockpile/db"
-	"github.com/sschwartz96/stockpile/mock"
-	"github.com/sschwartz96/syncapod/internal/database"
-	"github.com/sschwartz96/syncapod/internal/protos"
-	"github.com/sschwartz96/syncapod/internal/util"
 	gogrpc "google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 )
 
 const bufSize = 1024 * 1024
 
-var lis *bufconn.Listener
+var (
+	lis    *bufconn.Listener
+	testDB *pgxpool.Pool
+)
 
 func bufDialer(context.Context, string) (net.Conn, error) {
 	return lis.Dial()
 }
 
+func TestMain(m *testing.M) {
+	// connect stop after 5 seconds
+	start := time.Now()
+	fiveSec := time.Second * 5
+	err := errors.New("start loop")
+	for err != nil {
+		if time.Since(start) > fiveSec {
+			log.Fatal(`Could not connect to postgres\n
+				Took longer than 5 seconds, maybe download postgres image`)
+		}
+		testDB, err = pgxpool.Connect(context.Background(),
+			fmt.Sprintf(
+				"postgres://postgres:secret@localhost:5432/postgres?sslmode=disable",
+			),
+		)
+		time.Sleep(time.Millisecond * 250)
+	}
+
+	// setup db
+	setupAuthDB()
+	setupPodcastDB()
+
+	// run tests
+	runCode := m.Run()
+
+	testDB.Close()
+
+	os.Exit(runCode)
+}
+
 // createAuthServiceMockDB fails on error and returns db.Database and *protos.User
 func createAuthServiceMockDB(t *testing.T) db.Database {
-	dbClient := mock.CreateDB()
 	user := &protos.User{
 		Id:       protos.ObjectIDFromHex("user_id"),
 		Username: "user",

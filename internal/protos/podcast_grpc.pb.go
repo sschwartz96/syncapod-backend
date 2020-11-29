@@ -131,7 +131,7 @@ type UnsafePodServer interface {
 	mustEmbedUnimplementedPodServer()
 }
 
-func RegisterPodServer(s *grpc.Server, srv PodServer) {
+func RegisterPodServer(s grpc.ServiceRegistrar, srv PodServer) {
 	s.RegisterService(&_Pod_serviceDesc, srv)
 }
 

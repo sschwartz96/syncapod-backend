@@ -2,69 +2,63 @@ package grpc
 
 import (
 	"context"
-	"fmt"
-	"log"
 
+	"github.com/google/uuid"
 	"github.com/sschwartz96/syncapod-backend/internal/auth"
 	"github.com/sschwartz96/syncapod-backend/internal/protos"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // AuthService is the gRPC service for authentication and authorization
 type AuthService struct {
 	*protos.UnimplementedAuthServer
-	authController *auth.AuthController
+	ac *auth.AuthController
 }
 
 // NewAuthService creates a new *AuthService
 func NewAuthService(a *auth.AuthController) *AuthService {
-	return &AuthService{authController: a}
+	return &AuthService{ac: a}
 }
 
 // Authenticate handles the authentication to syncapod and returns response
-func (a *AuthService) Authenticate(ctx context.Context, req *protos.AuthReq) (*protos.AuthRes, error) {
-	res := &protos.AuthRes{Success: false}
-	// find user from database
-	user, err := user.FindUser(a.dbClient, req.Username)
+func (a *AuthService) Authenticate(ctx context.Context, req *protos.AuthenticateReq) (*protos.AuthenticateRes, error) {
+	userRow, seshRow, err := a.ac.Login(ctx, req.Username, req.Password, req.UserAgent)
 	if err != nil {
-		return nil, fmt.Errorf("Authenticate(), error finding user: %v", err)
+		return nil, status.Errorf(codes.InvalidArgument, "invalid username or password")
 	}
-	// authenticate
-	if auth.Compare(user.Password, req.Password) {
-		// create session
-		key, err := auth.CreateSession(a.dbClient, user.Id, req.UserAgent, req.StayLoggedIn)
-		if err != nil {
-			log.Println("error creating session:", err)
-			return nil, fmt.Errorf("Authenticate(), error creating session: %v", err)
-		} else {
-			res.Success = true
-			res.User = user
-			res.SessionKey = key
-			res.User.Password = ""
-		}
-	}
-	return res, nil
+	return &protos.AuthenticateRes{
+		SessionKey: seshRow.ID.String(),
+		User:       protos.UserFromDB(userRow),
+	}, nil
 }
 
 // Authorize authorizes user based on a session key
-func (a *AuthService) Authorize(ctx context.Context, req *protos.AuthReq) (*protos.AuthRes, error) {
-	user, err := auth.ValidateSession(a.dbClient, req.SessionKey)
+func (a *AuthService) Authorize(ctx context.Context, req *protos.AuthorizeReq) (*protos.AuthorizeRes, error) {
+	seshKey, err := uuid.Parse(req.GetSessionKey())
 	if err != nil {
-		return nil, fmt.Errorf("Authorize() error validating user session: %v", err)
+		return nil, status.Errorf(codes.InvalidArgument, "malformed session key uuid")
 	}
-	user.Password = ""
-	res := &protos.AuthRes{
-		Success:    true,
-		SessionKey: req.SessionKey,
-		User:       user,
+	userRow, err := a.ac.Authorize(ctx, seshKey)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid session key")
 	}
-	return res, nil
+	return &protos.AuthorizeRes{
+		User: protos.UserFromDB(userRow),
+	}, nil
 }
 
 // Logout removes the given session key
-func (a *AuthService) Logout(ctx context.Context, req *protos.AuthReq) (*protos.AuthRes, error) {
-	err := user.DeleteSessionByKey(a.dbClient, req.SessionKey)
+func (a *AuthService) Logout(ctx context.Context, req *protos.LogoutReq) (*protos.LogoutRes, error) {
+	seshKey, err := uuid.Parse(req.GetSessionKey())
 	if err != nil {
-		return nil, fmt.Errorf("Logout() error deleting session: %v", err)
+		return nil, status.Errorf(codes.InvalidArgument, "malformed session key uuid")
 	}
-	return &protos.AuthRes{Success: true}, nil
+	err = a.ac.Logout(ctx, seshKey)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error: %v", err)
+	}
+	return &protos.LogoutRes{
+		Success: true,
+	}, nil
 }
