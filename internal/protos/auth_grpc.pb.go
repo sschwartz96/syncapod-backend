@@ -17,9 +17,9 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AuthClient interface {
-	Authenticate(ctx context.Context, in *AuthenticateReq, opts ...grpc.CallOption) (*AuthenticateRes, error)
-	Authorize(ctx context.Context, in *AuthorizeReq, opts ...grpc.CallOption) (*AuthorizeRes, error)
-	Logout(ctx context.Context, in *LogoutReq, opts ...grpc.CallOption) (*LogoutRes, error)
+	Authenticate(ctx context.Context, in *AuthReq, opts ...grpc.CallOption) (*AuthRes, error)
+	Authorize(ctx context.Context, in *AuthReq, opts ...grpc.CallOption) (*AuthRes, error)
+	Logout(ctx context.Context, in *AuthReq, opts ...grpc.CallOption) (*AuthRes, error)
 }
 
 type authClient struct {
@@ -30,8 +30,8 @@ func NewAuthClient(cc grpc.ClientConnInterface) AuthClient {
 	return &authClient{cc}
 }
 
-func (c *authClient) Authenticate(ctx context.Context, in *AuthenticateReq, opts ...grpc.CallOption) (*AuthenticateRes, error) {
-	out := new(AuthenticateRes)
+func (c *authClient) Authenticate(ctx context.Context, in *AuthReq, opts ...grpc.CallOption) (*AuthRes, error) {
+	out := new(AuthRes)
 	err := c.cc.Invoke(ctx, "/protos.Auth/Authenticate", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -39,8 +39,8 @@ func (c *authClient) Authenticate(ctx context.Context, in *AuthenticateReq, opts
 	return out, nil
 }
 
-func (c *authClient) Authorize(ctx context.Context, in *AuthorizeReq, opts ...grpc.CallOption) (*AuthorizeRes, error) {
-	out := new(AuthorizeRes)
+func (c *authClient) Authorize(ctx context.Context, in *AuthReq, opts ...grpc.CallOption) (*AuthRes, error) {
+	out := new(AuthRes)
 	err := c.cc.Invoke(ctx, "/protos.Auth/Authorize", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -48,8 +48,8 @@ func (c *authClient) Authorize(ctx context.Context, in *AuthorizeReq, opts ...gr
 	return out, nil
 }
 
-func (c *authClient) Logout(ctx context.Context, in *LogoutReq, opts ...grpc.CallOption) (*LogoutRes, error) {
-	out := new(LogoutRes)
+func (c *authClient) Logout(ctx context.Context, in *AuthReq, opts ...grpc.CallOption) (*AuthRes, error) {
+	out := new(AuthRes)
 	err := c.cc.Invoke(ctx, "/protos.Auth/Logout", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -61,9 +61,9 @@ func (c *authClient) Logout(ctx context.Context, in *LogoutReq, opts ...grpc.Cal
 // All implementations must embed UnimplementedAuthServer
 // for forward compatibility
 type AuthServer interface {
-	Authenticate(context.Context, *AuthenticateReq) (*AuthenticateRes, error)
-	Authorize(context.Context, *AuthorizeReq) (*AuthorizeRes, error)
-	Logout(context.Context, *LogoutReq) (*LogoutRes, error)
+	Authenticate(context.Context, *AuthReq) (*AuthRes, error)
+	Authorize(context.Context, *AuthReq) (*AuthRes, error)
+	Logout(context.Context, *AuthReq) (*AuthRes, error)
 	mustEmbedUnimplementedAuthServer()
 }
 
@@ -71,13 +71,13 @@ type AuthServer interface {
 type UnimplementedAuthServer struct {
 }
 
-func (UnimplementedAuthServer) Authenticate(context.Context, *AuthenticateReq) (*AuthenticateRes, error) {
+func (UnimplementedAuthServer) Authenticate(context.Context, *AuthReq) (*AuthRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Authenticate not implemented")
 }
-func (UnimplementedAuthServer) Authorize(context.Context, *AuthorizeReq) (*AuthorizeRes, error) {
+func (UnimplementedAuthServer) Authorize(context.Context, *AuthReq) (*AuthRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Authorize not implemented")
 }
-func (UnimplementedAuthServer) Logout(context.Context, *LogoutReq) (*LogoutRes, error) {
+func (UnimplementedAuthServer) Logout(context.Context, *AuthReq) (*AuthRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Logout not implemented")
 }
 func (UnimplementedAuthServer) mustEmbedUnimplementedAuthServer() {}
@@ -94,7 +94,7 @@ func RegisterAuthServer(s *grpc.Server, srv AuthServer) {
 }
 
 func _Auth_Authenticate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AuthenticateReq)
+	in := new(AuthReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -106,13 +106,13 @@ func _Auth_Authenticate_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: "/protos.Auth/Authenticate",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthServer).Authenticate(ctx, req.(*AuthenticateReq))
+		return srv.(AuthServer).Authenticate(ctx, req.(*AuthReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Auth_Authorize_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AuthorizeReq)
+	in := new(AuthReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -124,13 +124,13 @@ func _Auth_Authorize_Handler(srv interface{}, ctx context.Context, dec func(inte
 		FullMethod: "/protos.Auth/Authorize",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthServer).Authorize(ctx, req.(*AuthorizeReq))
+		return srv.(AuthServer).Authorize(ctx, req.(*AuthReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Auth_Logout_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(LogoutReq)
+	in := new(AuthReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func _Auth_Logout_Handler(srv interface{}, ctx context.Context, dec func(interfa
 		FullMethod: "/protos.Auth/Logout",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthServer).Logout(ctx, req.(*LogoutReq))
+		return srv.(AuthServer).Logout(ctx, req.(*AuthReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }

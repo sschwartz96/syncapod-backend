@@ -9,6 +9,8 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/jackc/pgx/v4 v4.9.2
+	github.com/sschwartz96/stockpile v0.2.5
+	github.com/sschwartz96/syncapod v0.0.0-20201107044624-97fc41f19a55
 	github.com/stretchr/testify v1.6.1
 	golang.org/x/crypto v0.0.0-20201117144127-c1f2f97bffc9
 	google.golang.org/grpc v1.33.1
