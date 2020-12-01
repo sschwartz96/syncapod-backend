@@ -8,7 +8,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/sschwartz96/syncapod-backend/internal/config"
+	"github.com/google/uuid"
+	"github.com/sschwartz96/syncapod-backend/internal/auth"
 	"github.com/sschwartz96/syncapod-backend/internal/protos"
 	"golang.org/x/crypto/acme/autocert"
 	"google.golang.org/grpc"
@@ -17,13 +18,13 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// Server is truly needed for its Intercept method which authenticates users before accessing services,
-// but also useful to have all the grpc server boilerplate contained within NewServer function
+// Server is truly needed for its Intercept method which authenticates users before accessing services, but also useful to have all the grpc server boilerplate contained within NewServer function
 type Server struct {
 	server *grpc.Server
+	authC  *auth.AuthController
 }
 
-func NewServer(cfg *config.Config, a *autocert.Manager, aS protos.AuthServer, pS protos.PodServer) *Server {
+func NewServer(a *autocert.Manager, aS protos.AuthServer, pS protos.PodServer) *Server {
 	var grpcServer *grpc.Server
 	s := &Server{}
 	// setup server
@@ -67,14 +68,17 @@ func (s *Server) Intercept() grpc.UnaryServerInterceptor {
 			return nil, errors.New("no access token sent")
 		}
 
-		user, err := auth.ValidateSession(s.db, token[0])
+		uuidTkn, err := uuid.Parse(token[0])
+		if err != nil {
+			return nil, fmt.Errorf("invalid uuid token: %v", err)
+		}
+		user, err := s.authC.Authorize(ctx, uuidTkn)
 		if err != nil {
 			return nil, fmt.Errorf("invalid access token: %v", err)
 		}
 
-		//md.Set("user_id", user.Id.Hex) // causes errors
 		newMD := md.Copy()
-		newMD.Set("user_id", user.Id.Hex)
+		newMD.Set("user_id", user.ID.String())
 		newCtx := metadata.NewIncomingContext(ctx, newMD)
 
 		return handler(newCtx, req)

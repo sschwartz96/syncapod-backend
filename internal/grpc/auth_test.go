@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/sschwartz96/syncapod-backend/internal/auth"
 	"github.com/sschwartz96/syncapod-backend/internal/db"
 	"github.com/sschwartz96/syncapod-backend/internal/protos"
 	"google.golang.org/grpc"
@@ -38,19 +39,6 @@ func bufDialer(context.Context, string) (net.Conn, error) {
 	return lis.Dial()
 }
 
-func createMockAuthClient() (authClient protos.AuthClient, cleanup func() error) {
-	ctx := context.Background()
-	conn, err := grpc.DialContext(ctx, "bufnet",
-		grpc.WithContextDialer(bufDialer),
-		grpc.WithInsecure(),
-	)
-	if err != nil {
-		log.Fatalf("Failed to dial bufnet: %v", err)
-	}
-	client := protos.NewAuthClient(conn)
-	return client, conn.Close
-}
-
 func TestMain(m *testing.M) {
 	// connect stop after 5 seconds
 	start := time.Now()
@@ -62,15 +50,32 @@ func TestMain(m *testing.M) {
 				Took longer than 5 seconds, maybe download postgres image`)
 		}
 		testDB, err = pgxpool.Connect(context.Background(),
-			fmt.Sprintf(
-				"postgres://postgres:secret@localhost:5432/postgres?sslmode=disable",
-			),
+			"postgres://postgres:secret@localhost:5432/postgres?sslmode=disable",
 		)
 		time.Sleep(time.Millisecond * 250)
 	}
 
 	// setup db
-	setupDB()
+	err = setupDB()
+	if err != nil {
+		log.Fatalf("grpc.TestMain() error setting up database")
+	}
+
+	// setup grpc server
+	lis = bufconn.Listen(bufSize)
+	s := grpc.NewServer()
+	protos.RegisterAuthServer(s,
+		NewAuthService(
+			auth.NewAuthController(db.NewAuthStorePG(testDB),
+				db.NewOAuthStorePG(testDB),
+			),
+		),
+	)
+	go func() {
+		if err := s.Serve(lis); err != nil {
+			log.Fatalf("gRPC test server exited with error: %v", err)
+		}
+	}()
 
 	// run tests
 	runCode := m.Run()
@@ -80,11 +85,15 @@ func TestMain(m *testing.M) {
 	os.Exit(runCode)
 }
 
-func setupDB() {
+func setupDB() error {
 	authStore := db.NewAuthStorePG(testDB)
-	authStore.InsertUser(context.Background(), testUser)
+	err := authStore.InsertUser(context.Background(), testUser)
+	if err != nil {
+		return fmt.Errorf("failed to insert user: %v", err)
+	}
+	return nil
 }
 
 func TestAuthGRPC(t *testing.T) {
-
+	//TODO: add test cases
 }
