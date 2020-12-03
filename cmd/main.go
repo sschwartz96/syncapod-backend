@@ -75,9 +75,9 @@ func main() {
 	rssController := podcast.NewRSSController(podController)
 
 	// setup & start gRPC server
-	grpcServer := sGRPC.NewServer(cfg, certMan,
-		services.NewAuthService(dbClient),
-		services.NewPodcastService(dbClient),
+	grpcServer := sGRPC.NewServer(certMan,
+		sGRPC.NewAuthService(authController),
+		sGRPC.NewPodcastService(),
 	)
 	go func() {
 		// setup listener

@@ -15,6 +15,7 @@ import (
 	"github.com/sschwartz96/syncapod-backend/internal/auth"
 	"github.com/sschwartz96/syncapod-backend/internal/db"
 	"github.com/sschwartz96/syncapod-backend/internal/protos"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 )
@@ -95,5 +96,45 @@ func setupDB() error {
 }
 
 func TestAuthGRPC(t *testing.T) {
-	//TODO: add test cases
+	// setup auth service
+	conn, err := grpc.DialContext(
+		context.Background(), "bufnet",
+		grpc.WithContextDialer(bufDialer),
+		grpc.WithInsecure(),
+	)
+	if err != nil {
+		t.Fatalf("failed to dial grpc bufnet: %v", err)
+	}
+	defer conn.Close()
+	client := protos.NewAuthClient(conn)
+
+	// Authenticate
+	autheRes, err := client.Authenticate(context.Background(),
+		&protos.AuthenticateReq{Username: testUser.Username, Password: "password"},
+	)
+	if err != nil {
+		t.Fatalf("Authenticate failed: %v", err)
+	}
+	require.NotEmpty(t, autheRes.SessionKey)
+	seshKey := autheRes.SessionKey
+	log.Println("got session key:", seshKey)
+
+	// Authorization
+	authoRes, err := client.Authorize(context.Background(),
+		&protos.AuthorizeReq{SessionKey: seshKey},
+	)
+	if err != nil {
+		t.Fatalf("Authorize failed: %v", err)
+	}
+	require.NotEmpty(t, authoRes.User)
+	log.Println("authorized user:", authoRes.User)
+
+	// Logout
+	logoutRes, err := client.Logout(context.Background(),
+		&protos.LogoutReq{SessionKey: seshKey},
+	)
+	if err != nil {
+		t.Fatalf("Logout failed: %v", err)
+	}
+	require.Equal(t, true, logoutRes.Success)
 }
