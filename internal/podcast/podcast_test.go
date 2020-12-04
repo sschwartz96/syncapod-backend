@@ -9,7 +9,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/sschwartz96/syncapod-backend/internal/db"
+)
+
+const (
+	testPod = &db.Podcast{
+		ID:     uuid.MustParse("d6d07b86-29b3-4ae7-b321-89eb5b64484c"),
+		Author: "sam schwartz",
+	}
 )
 
 var (
@@ -46,5 +55,4 @@ func TestMain(m *testing.M) {
 }
 
 func setupPodcastDB() {
-
 }

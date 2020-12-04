@@ -15,3 +15,13 @@ func UserFromDB(ur *db.UserRow) *User {
 		DOB:      timestamppb.New(ur.Birthdate),
 	}
 }
+
+// TODO: orchestrate conversion of db.Category([]int) -> podcast.Category -> protos.Category
+// where no circular dependencies exist
+func PodcastFromDB(pr *db.Podcast, cats []*Category) *Podcast {
+	return &Podcast{
+		Id:       pr.ID.String(),
+		Author:   pr.Author,
+		Category: cats,
+	}
+}
