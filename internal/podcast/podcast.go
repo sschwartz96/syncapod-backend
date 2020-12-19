@@ -13,6 +13,10 @@ type PodController struct {
 	catCache *CategoryCache
 }
 
+func (p *PodController) ConvertCategories(ids []int) *Category {
+	return p.ConvertCategories(ids)
+}
+
 func NewPodController(podStore *db.PodcastStore) (*PodController, error) {
 	cats, err := podStore.FindAllCategories(context.Background())
 	if err != nil {

@@ -12,8 +12,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/sschwartz96/syncapod-backend/internal/auth"
 	"github.com/sschwartz96/syncapod-backend/internal/db"
 	"github.com/sschwartz96/syncapod-backend/internal/protos"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 )
@@ -38,19 +40,6 @@ func bufDialer(context.Context, string) (net.Conn, error) {
 	return lis.Dial()
 }
 
-func createMockAuthClient() (authClient protos.AuthClient, cleanup func() error) {
-	ctx := context.Background()
-	conn, err := grpc.DialContext(ctx, "bufnet",
-		grpc.WithContextDialer(bufDialer),
-		grpc.WithInsecure(),
-	)
-	if err != nil {
-		log.Fatalf("Failed to dial bufnet: %v", err)
-	}
-	client := protos.NewAuthClient(conn)
-	return client, conn.Close
-}
-
 func TestMain(m *testing.M) {
 	// connect stop after 5 seconds
 	start := time.Now()
@@ -62,15 +51,32 @@ func TestMain(m *testing.M) {
 				Took longer than 5 seconds, maybe download postgres image`)
 		}
 		testDB, err = pgxpool.Connect(context.Background(),
-			fmt.Sprintf(
-				"postgres://postgres:secret@localhost:5432/postgres?sslmode=disable",
-			),
+			"postgres://postgres:secret@localhost:5432/postgres?sslmode=disable",
 		)
 		time.Sleep(time.Millisecond * 250)
 	}
 
 	// setup db
-	setupDB()
+	err = setupDB()
+	if err != nil {
+		log.Fatalf("grpc.TestMain() error setting up database")
+	}
+
+	// setup grpc server
+	lis = bufconn.Listen(bufSize)
+	s := grpc.NewServer()
+	protos.RegisterAuthServer(s,
+		NewAuthService(
+			auth.NewAuthController(db.NewAuthStorePG(testDB),
+				db.NewOAuthStorePG(testDB),
+			),
+		),
+	)
+	go func() {
+		if err := s.Serve(lis); err != nil {
+			log.Fatalf("gRPC test server exited with error: %v", err)
+		}
+	}()
 
 	// run tests
 	runCode := m.Run()
@@ -80,11 +86,55 @@ func TestMain(m *testing.M) {
 	os.Exit(runCode)
 }
 
-func setupDB() {
+func setupDB() error {
 	authStore := db.NewAuthStorePG(testDB)
-	authStore.InsertUser(context.Background(), testUser)
+	err := authStore.InsertUser(context.Background(), testUser)
+	if err != nil {
+		return fmt.Errorf("failed to insert user: %v", err)
+	}
+	return nil
 }
 
 func TestAuthGRPC(t *testing.T) {
+	// setup auth service
+	conn, err := grpc.DialContext(
+		context.Background(), "bufnet",
+		grpc.WithContextDialer(bufDialer),
+		grpc.WithInsecure(),
+	)
+	if err != nil {
+		t.Fatalf("failed to dial grpc bufnet: %v", err)
+	}
+	defer conn.Close()
+	client := protos.NewAuthClient(conn)
 
+	// Authenticate
+	autheRes, err := client.Authenticate(context.Background(),
+		&protos.AuthenticateReq{Username: testUser.Username, Password: "password"},
+	)
+	if err != nil {
+		t.Fatalf("Authenticate failed: %v", err)
+	}
+	require.NotEmpty(t, autheRes.SessionKey)
+	seshKey := autheRes.SessionKey
+	log.Println("got session key:", seshKey)
+
+	// Authorization
+	authoRes, err := client.Authorize(context.Background(),
+		&protos.AuthorizeReq{SessionKey: seshKey},
+	)
+	if err != nil {
+		t.Fatalf("Authorize failed: %v", err)
+	}
+	require.NotEmpty(t, authoRes.User)
+	log.Println("authorized user:", authoRes.User)
+
+	// Logout
+	logoutRes, err := client.Logout(context.Background(),
+		&protos.LogoutReq{SessionKey: seshKey},
+	)
+	if err != nil {
+		t.Fatalf("Logout failed: %v", err)
+	}
+	require.Equal(t, true, logoutRes.Success)
 }
