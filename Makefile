@@ -1,4 +1,4 @@
-.PHONY: db migrate run test
+.PHONY: db migrate run test testv test-db coverage protos
 
 db:
 	docker run -d --rm -ti --network host -e POSTGRES_PASSWORD=secret postgres
