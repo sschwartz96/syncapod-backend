@@ -35,8 +35,8 @@ func (p *PodcastService) GetPodcast(ctx context.Context, req *protos.Request) (*
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "Could not find podcast error: %v", err)
 	}
-	podcast := p.podCon
-	return podcast, nil
+	pod := p.podCon.ConvertCategories(dbPod.Category)
+	return pod, nil
 }
 
 // GetEpisodes returns a list of episodes via podcast id
