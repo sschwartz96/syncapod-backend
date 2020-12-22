@@ -8,6 +8,7 @@ testdb:
 	sleep 1.5 # wait enough time to run migrations
 	migrate  -source file://migrations \
 		-database postgres://postgres:secret@localhost/postgres?sslmode=disable up
+	richgo test ./internal/db; docker stop pg_test -t 1
 
 migrate:
 	migrate -source file://migrations \

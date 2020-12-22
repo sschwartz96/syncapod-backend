@@ -12,7 +12,8 @@ import (
 
 var (
 	testPod     = &Podcast{ID: uuid.New(), Author: "Sam Schwartz", Description: "Syncapod Podcast", LinkURL: "https://syncapod.com/podcast", ImageURL: "http://syncapod.com/logo.png", Language: "en", Category: []int{1, 2, 3}, Explicit: "clean", RSSURL: "https://syncapod.com/podcast.rss"}
-	testEpi     = &Episode{ID: uuid.New(), PodcastID: testPod.ID, Title: "Test Episode", Episode: 123}
+	testEpi     = &Episode{ID: uuid.New(), PodcastID: testPod.ID, Title: "Test Episode", Episode: 123, PubDate: time.Unix(1000, 0)}
+	testEpi2    = &Episode{ID: uuid.New(), PodcastID: testPod.ID, Title: "Test Episode 2", Episode: 124, PubDate: time.Unix(1001, 0)}
 	testUser    = &UserRow{ID: uuid.New(), Username: "dbTestUser", PasswordHash: []byte("shouldbehash")}
 	testUserEpi = &UserEpisode{EpisodeID: testEpi.ID, UserID: testUser.ID, LastSeen: time.Now(), OffsetMillis: 123456, Played: false}
 )
@@ -24,10 +25,8 @@ func setupPodcastDB() {
 	if err != nil {
 		log.Fatalf("db.setupPodcastDB() error: %v", err)
 	}
-	err = podStore.InsertEpisode(context.Background(), testEpi)
-	if err != nil {
-		log.Fatalf("db.setupPodcastDB() error: %v", err)
-	}
+	insertEpisodeOrFail(podStore, testEpi)
+	insertEpisodeOrFail(podStore, testEpi2)
 	err = authStore.InsertUser(context.Background(), testUser)
 	if err != nil {
 		log.Fatalf("db.setupPodcastDB() error: %v", err)
@@ -35,6 +34,13 @@ func setupPodcastDB() {
 	err = podStore.UpsertUserEpisode(context.Background(), testUserEpi)
 	if err != nil {
 		log.Fatalf("db.setupPodcastDB() error: %v", err)
+	}
+}
+
+func insertEpisodeOrFail(podStore *PodcastStore, e *Episode) {
+	err := podStore.InsertEpisode(context.Background(), e)
+	if err != nil {
+		log.Fatalf("db.insertEpisodeOrFail() error: %v", err)
 	}
 }
 
@@ -80,7 +86,7 @@ func Test_FindLatestEpisode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Test_FindLatestEpisode() error: %v", err)
 	}
-	require.Equal(t, testEpi.ID, epi.ID)
+	require.Equal(t, testEpi2.ID, epi.ID)
 }
 
 func Test_FindEpisodeByID(t *testing.T) {
@@ -179,4 +185,13 @@ func Test_UpsertUserEpisode(t *testing.T) {
 		t.Fatalf("Test_UpsertUserEpisode() error finding user epi: %v", err)
 	}
 	require.Equal(t, upsertUserEpi.OffsetMillis, upsertUserEpi2.OffsetMillis)
+}
+
+func Test_FindEpisodesByRange(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	epis, err := podStore.FindEpisodesByRange(context.Background(), testPod.ID, 0, 2)
+	if err != nil {
+		t.Fatalf("Test_FindEpisodesByRange() error finding episodes: %v", err)
+	}
+	require.Equal(t, []Episode{*testEpi2, *testEpi}, epis)
 }

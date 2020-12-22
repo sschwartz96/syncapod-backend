@@ -45,6 +45,7 @@ func (p *PodcastService) GetPodcast(ctx context.Context, req *protos.Request) (*
 
 // GetEpisodes returns a list of episodes via podcast id
 func (p *PodcastService) GetEpisodes(ctx context.Context, req *protos.Request) (*protos.Episodes, error) {
+	p.podCon.FindEpisodesByRange
 	var episodes []*protos.Episode
 	var err error
 	// get the id and validate

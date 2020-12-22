@@ -31,9 +31,22 @@ func scanPodcastRows(rows pgx.Rows, p []Podcast) ([]Podcast, error) {
 		p = append(p, *temp)
 	}
 	if err := rows.Err(); err != nil {
-		return p, fmt.Errorf("FindPodcastsByRange() error while reading: %v", err)
+		return p, fmt.Errorf("scanPodcastRows() error while reading: %v", err)
 	}
 	return p, nil
+}
+
+// scanEpisodeRows is helper method that scans mutiple rows in an episode slice
+func scanEpisodeRows(rows pgx.Rows, e []Episode) ([]Episode, error) {
+	for rows.Next() {
+		temp := &Episode{}
+		scanEpisodeRow(rows, temp)
+		e = append(e, *temp)
+	}
+	if err := rows.Err(); err != nil {
+		return e, fmt.Errorf("scanEpisodeRows() error while reading: %v", err)
+	}
+	return e, nil
 }
 
 // scanPodcastRow is a helper method to scan row into a podcast struct
@@ -150,6 +163,16 @@ func (p *PodcastStore) FindEpisodeByURL(ctx context.Context, podID uuid.UUID, mp
 		return nil, fmt.Errorf("FindEpisodeByURL() error: %v", err)
 	}
 	return epi, nil
+}
+
+func (ps *PodcastStore) FindEpisodesByRange(ctx context.Context, podID uuid.UUID, start, end int) ([]Episode, error) {
+	limit := end - start
+	offset := start
+	rows, err := ps.db.Query(ctx, "SELECT * FROM Episodes ORDER BY pub_date DESC LIMIT $1 OFFSET $2 ", limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("FindPodcastsByRange() error: %v", err)
+	}
+	return scanEpisodeRows(rows, []Episode{})
 }
 
 func (p *PodcastStore) FindAllCategories(ctx context.Context) ([]Category, error) {

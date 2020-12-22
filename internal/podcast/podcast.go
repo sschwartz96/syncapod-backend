@@ -13,10 +13,6 @@ type PodController struct {
 	catCache *CategoryCache
 }
 
-func (p *PodController) ConvertCategories(ids []int) ([]Category, error) {
-	return p.catCache.LookupIDs(ids)
-}
-
 func NewPodController(podStore *db.PodcastStore) (*PodController, error) {
 	cats, err := podStore.FindAllCategories(context.Background())
 	if err != nil {
@@ -24,6 +20,10 @@ func NewPodController(podStore *db.PodcastStore) (*PodController, error) {
 	}
 	catCache := newCategoryCache(cats)
 	return &PodController{podStore, catCache}, nil
+}
+
+func (p *PodController) ConvertCategories(ids []int) ([]Category, error) {
+	return p.catCache.LookupIDs(ids)
 }
 
 func (c *PodController) DoesPodcastExist(ctx context.Context, rssURL string) bool {
