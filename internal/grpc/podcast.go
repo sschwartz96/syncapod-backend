@@ -35,7 +35,11 @@ func (p *PodcastService) GetPodcast(ctx context.Context, req *protos.Request) (*
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "Could not find podcast error: %v", err)
 	}
-	pod := p.podCon.ConvertCategories(dbPod.Category)
+	podCat, err := p.podCon.ConvertCategories(dbPod.Category)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not convert category ids: %v", err)
+	}
+	pod := podcastFromDB(dbPod, podCat)
 	return pod, nil
 }
 

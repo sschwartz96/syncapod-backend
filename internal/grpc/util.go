@@ -18,10 +18,25 @@ func userFromDB(ur *db.UserRow) *protos.User {
 	}
 }
 
-func podcastFromDB(pr *db.Podcast, cats []*podcast.Category) *protos.Podcast {
+func podcastFromDB(pr *db.Podcast, cats []podcast.Category) *protos.Podcast {
 	return &protos.Podcast{
 		Id:       pr.ID.String(),
 		Author:   pr.Author,
-		Category: cats,
+		Category: podCatsToProtoCats(cats),
+	}
+}
+
+func podCatsToProtoCats(podCats []podcast.Category) []*protos.Category {
+	protoCats := []*protos.Category{}
+	for i, _ := range podCats {
+		protoCats = append(protoCats, podCatToProtoCat(podCats[i]))
+	}
+	return protoCats
+}
+
+func podCatToProtoCat(podCat podcast.Category) *protos.Category {
+	return &protos.Category{
+		Category: podCatsToProtoCats(podCat.Subcategories),
+		Text:     podCat.Name,
 	}
 }

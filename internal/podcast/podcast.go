@@ -13,8 +13,8 @@ type PodController struct {
 	catCache *CategoryCache
 }
 
-func (p *PodController) ConvertCategories(ids []int) *Category {
-	return p.ConvertCategories(ids)
+func (p *PodController) ConvertCategories(ids []int) ([]Category, error) {
+	return p.catCache.LookupIDs(ids)
 }
 
 func NewPodController(podStore *db.PodcastStore) (*PodController, error) {
