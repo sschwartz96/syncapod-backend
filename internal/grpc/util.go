@@ -20,9 +20,20 @@ func userFromDB(ur *db.UserRow) *protos.User {
 
 func podcastFromDB(pr *db.Podcast, cats []podcast.Category) *protos.Podcast {
 	return &protos.Podcast{
-		Id:       pr.ID.String(),
-		Author:   pr.Author,
-		Category: podCatsToProtoCats(cats),
+		Id:            pr.ID.String(),
+		Title:         pr.Title,
+		Summary:       pr.Summary,
+		Author:        pr.Author,
+		Category:      podCatsToProtoCats(cats),
+		Explicit:      pr.Explicit,
+		Image:         &protos.Image{Url: pr.ImageURL},
+		Keywords:      pr.Keywords,
+		Language:      pr.Language,
+		LastBuildDate: timestamppb.New(pr.PubDate), // TODO: proper build date?
+		Link:          pr.LinkURL,
+		PubDate:       timestamppb.New(pr.PubDate),
+		Rss:           pr.RSSURL,
+		Episodic:      pr.Episodic,
 	}
 }
 

@@ -317,10 +317,17 @@ func (c *RSSController) rssChannelToPodcast(r *rssChannel, id uuid.UUID, rssURL 
 		Block:       strings.ToLower(r.Block) == "yes",
 		Complete:    strings.ToLower(r.Complete) == "yes",
 		PubDate:     *pubDate,
-		Keywords:    r.Keywords,
+		Keywords:    parseKeywords(r.Keywords),
 		Summary:     r.Summary,
 		RSSURL:      rssURL,
 	}
+}
+
+// parseKeywords takes a keyword string ("asdf, xyz,qwer")
+// removes all whitespace splits comma delimiter
+func parseKeywords(k string) []string {
+	k = strings.ReplaceAll(k, " ", "")
+	return strings.Split(k, ",")
 }
 
 func rssItemToDBEpisode(r *rssItem, podID uuid.UUID) *db.Episode {

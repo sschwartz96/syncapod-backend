@@ -55,7 +55,7 @@ CREATE TABLE Podcasts (
 	complete BOOLEAN,
 	-- RSS/OTHER
 	pub_date TIMESTAMPTZ,
-	keywords TEXT,
+	keywords TEXT[],
 	summary TEXT,
 	rss_url TEXT NOT NULL
 );

@@ -114,7 +114,7 @@ type Podcast struct {
 	Complete  bool
 	// RSS/OTHER
 	PubDate  time.Time
-	Keywords string
+	Keywords []string
 	Summary  string
 	RSSURL   string
 }
