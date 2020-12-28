@@ -37,6 +37,25 @@ func podcastFromDB(pr *db.Podcast, cats []podcast.Category) *protos.Podcast {
 	}
 }
 
+func episodeFromDB(er *db.Episode) *protos.Episode {
+	return &protos.Episode{
+		Id:             er.ID.String(),
+		PodcastID:      er.PodcastID.String(),
+		Title:          er.Title,
+		Subtitle:       er.Subtitle,
+		EpisodeType:    er.EpisodeType,
+		Image:          &protos.Image{Title: er.ImageTitle, Url: er.ImageURL},
+		PubDate:        timestamppb.New(er.PubDate),
+		Description:    er.Description,
+		Summary:        er.Summary,
+		Season:         int32(er.Season),
+		Episode:        int32(er.Episode),
+		Explicit:       er.Explicit,
+		MP3URL:         er.EnclosureURL,
+		DurationMillis: er.Duration,
+	}
+}
+
 func podCatsToProtoCats(podCats []podcast.Category) []*protos.Category {
 	protoCats := []*protos.Category{}
 	for i, _ := range podCats {

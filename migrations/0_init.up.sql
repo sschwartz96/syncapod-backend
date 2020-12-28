@@ -73,6 +73,7 @@ CREATE TABLE Episodes (
 	duration BIGINT,
 	link_url TEXT,
 	image_url TEXT,
+	image_text TEXT,
 	explicit TEXT,
 	-- SITUATIONAL TAGS
 	episode INT,
@@ -80,6 +81,7 @@ CREATE TABLE Episodes (
 	episode_type TEXT, -- Full, Trailer, Bonus
 	--	block BOOLEAN,
 	-- OTHER
+	subtitle TEXT,
 	summary TEXT,
 	encoded TEXT,
 	podcast_id UUID NOT NULL REFERENCES Podcasts(id) ON DELETE CASCADE

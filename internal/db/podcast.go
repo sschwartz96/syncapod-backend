@@ -56,7 +56,7 @@ func scanPodcastRow(row scanner, p *Podcast) error {
 
 // scanPodcastRow is a helper method to scan row into a podcast struct
 func scanEpisodeRow(row scanner, e *Episode) error {
-	return row.Scan(&e.ID, &e.Title, &e.EnclosureURL, &e.EnclosureLength, &e.EnclosureType, &e.PubDate, &e.Description, &e.Duration, &e.LinkURL, &e.ImageURL, &e.Explicit, &e.Episode, &e.Season, &e.EpisodeType, &e.Summary, &e.Encoded, &e.PodcastID)
+	return row.Scan(&e.ID, &e.Title, &e.EnclosureURL, &e.EnclosureLength, &e.EnclosureType, &e.PubDate, &e.Description, &e.Duration, &e.LinkURL, &e.ImageURL, &e.ImageTitle, &e.Explicit, &e.Episode, &e.Season, &e.EpisodeType, &e.Subtitle, &e.Summary, &e.Encoded, &e.PodcastID)
 }
 
 // Podcast stuff
@@ -116,9 +116,9 @@ func (ps *PodcastStore) SearchPodcasts(ctx context.Context, search string) ([]Po
 // Episode stuff
 
 func (p *PodcastStore) InsertEpisode(ctx context.Context, e *Episode) error {
-	_, err := p.db.Exec(ctx, `INSERT INTO Episodes(id,title,enclosure_url,enclosure_length,enclosure_type,pub_date,description,duration,link_url,image_url,explicit,episode,season,episode_type,summary,encoded,podcast_id)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
-		&e.ID, &e.Title, &e.EnclosureURL, &e.EnclosureLength, &e.EnclosureType, &e.PubDate, &e.Description, &e.Duration, &e.LinkURL, &e.ImageURL, &e.Explicit, &e.Episode, &e.Season, &e.EpisodeType, &e.Summary, &e.Encoded, &e.PodcastID)
+	_, err := p.db.Exec(ctx, `INSERT INTO Episodes(id,title,enclosure_url,enclosure_length,enclosure_type,pub_date,description,duration,link_url,image_url,image_title,explicit,episode,season,episode_type,subtitlesummary,encoded,podcast_id)
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+		&e.ID, &e.Title, &e.EnclosureURL, &e.EnclosureLength, &e.EnclosureType, &e.PubDate, &e.Description, &e.Duration, &e.LinkURL, &e.ImageURL, &e.ImageTitle, &e.Explicit, &e.Episode, &e.Season, &e.EpisodeType, &e.Subtitle, &e.Summary, &e.Encoded, &e.PodcastID)
 	if err != nil {
 		return fmt.Errorf("InsertEpisode() error: %v", err)
 	}

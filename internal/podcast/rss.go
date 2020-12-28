@@ -278,7 +278,8 @@ type rssItem struct {
 	Episode     string `xml:"episode"`
 	Season      string `xml:"season"`
 	Image       struct {
-		Href string `xml:"href,attr"`
+		Href  string `xml:"href,attr"`
+		Title string `xml:"title,attr"`
 	} `xml:"image"`
 	Duration string `xml:"duration"`
 	Explicit string `xml:"explicit"`
@@ -357,11 +358,13 @@ func rssItemToDBEpisode(r *rssItem, podID uuid.UUID) *db.Episode {
 		Duration:        duration,
 		LinkURL:         r.Link,
 		ImageURL:        r.Image.Href,
+		ImageTitle:      r.Image.Title,
 		Explicit:        r.Explicit,
 		Episode:         episode,
 		Season:          season,
 		EpisodeType:     r.EpisodeType,
 		Summary:         r.Summary,
+		Subtitle:        r.Subtitle,
 		Encoded:         r.Encoded,
 		PodcastID:       podID,
 	}
