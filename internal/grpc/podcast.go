@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/google/uuid"
+	"github.com/sschwartz96/syncapod-backend/internal/db"
 	"github.com/sschwartz96/syncapod-backend/internal/podcast"
 	"github.com/sschwartz96/syncapod-backend/internal/protos"
 	"google.golang.org/grpc/codes"
@@ -46,50 +47,57 @@ func (p *PodcastService) GetPodcast(ctx context.Context, req *protos.Request) (*
 // GetEpisodes returns a list of episodes via podcast id
 func (p *PodcastService) GetEpisodes(ctx context.Context, req *protos.Request) (*protos.Episodes, error) {
 	podID, err := uuid.Parse(req.PodcastID)
-	p.podCon.FindEpisodesByRange(ctx, podID)
-	var episodes []*protos.Episode
-	var err error
-	// get the id and validate
-	if req.PodcastID != nil || len(req.PodcastID.Hex) > 0 {
-		episodes, err = podcast.FindEpisodesByRange(p.dbClient, req.PodcastID, req.Start, req.End)
-		if err != nil {
-			fmt.Println("error grpc GetEpisodes:", err)
-			return &protos.Episodes{Episodes: []*protos.Episode{}}, nil
-		}
-	} else {
-		return &protos.Episodes{Episodes: []*protos.Episode{}}, fmt.Errorf("no podcast id supplied")
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "Could not parse podcast UUID")
 	}
-	return &protos.Episodes{Episodes: episodes}, nil
+	dbEpis, err := p.podCon.FindEpisodesByRange(ctx, podID, req.Start, req.End)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "Could not find episodes by range")
+	}
+	epis := convertEpisFromDB(dbEpis)
+	return &protos.Episodes{Episodes: epis}, nil
 }
 
 // GetUserEpisode returns the user playback metadata via episode id & user id
 func (p *PodcastService) GetUserEpisode(ctx context.Context, req *protos.Request) (*protos.UserEpisode, error) {
 	userID, err := getUserIDFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("GetUserEpisode() error getting userID: %v", err)
+		return nil, status.Error(codes.FailedPrecondition, "User not authenticated")
 	}
-	userEpi, err := user.FindUserEpisode(p.dbClient, userID, req.EpisodeID)
+	epiID, err := uuid.Parse(req.EpisodeID)
 	if err != nil {
-		fmt.Println("error finding userEpi:", err)
+		return nil, status.Error(codes.InvalidArgument, "Could not parse episode uuid")
 	}
-	return userEpi, nil
+	dbUserEpi, err := p.podCon.FindUserEpisode(ctx, userID, epiID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Could not retrieve user episode: %v", err))
+	}
+	return convertUserEpiFromDB(dbUserEpi), nil
 }
 
 // UpdateUserEpisode updates the user playback metadata via episode id & user id
 func (p *PodcastService) UpdateUserEpisode(ctx context.Context, req *protos.UserEpisodeReq) (*protos.Response, error) {
+	userID, err := getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Error(codes.FailedPrecondition, "User not authenticated")
+	}
+	epiID, err := uuid.Parse(req.EpisodeID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "Could not parse episode UUID")
+	}
 	if req.LastSeen == nil {
 		req.LastSeen = ptypes.TimestampNow()
 	}
-	userEpi := &protos.UserEpisode{
-		EpisodeID: req.EpisodeID,
-		PodcastID: req.PodcastID,
-		Played:    req.Played,
-		Offset:    req.Offset,
+	userEpi := &db.UserEpisode{
+		UserID:       userID,
+		EpisodeID:    epiID,
+		OffsetMillis: req.Offset,
+		LastSeen:     req.LastSeen.AsTime(),
+		Played:       req.Played,
 	}
-	err := user.UpsertUserEpisode(p.dbClient, userEpi)
+	err = p.podCon.UpsertUserEpisode(ctx, userEpi)
 	if err != nil {
-		fmt.Println("error updating user episode", err)
-		return &protos.Response{Success: false, Message: err.Error()}, nil
+		return nil, status.Error(codes.Internal, "Error upserting user epi")
 	}
 	return &protos.Response{Success: true, Message: ""}, nil
 }
@@ -101,7 +109,7 @@ func (p *PodcastService) GetSubscriptions(ctx context.Context, req *protos.Reque
 		return nil, fmt.Errorf("GetSubscriptions() error getting user id: %v", err)
 	}
 
-	subs, err := user.FindSubscriptions(p.dbClient, userID)
+	subs, err := p.podCon.FindSubscriptions(p.dbClient, userID)
 	if err != nil {
 		log.Println("GetSubscriptions() error getting subs:", err)
 		return &protos.Subscriptions{}, nil
@@ -129,14 +137,14 @@ func (p *PodcastService) GetUserLastPlayed(ctx context.Context, req *protos.Requ
 	}, nil
 }
 
-func getUserIDFromContext(ctx context.Context) (*protos.ObjectID, error) {
+func getUserIDFromContext(ctx context.Context) (uuid.UUID, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, fmt.Errorf("getUserIDFromContext() error: metadata not valid")
 	}
-	idHex := md.Get("user_id")
-	if len(idHex) == 0 {
+	idString := md.Get("user_id")
+	if len(idString) == 0 {
 		return nil, fmt.Errorf("getUserIDFromContext() error: no user id")
 	}
-	return protos.ObjectIDFromHex(idHex[0]), nil
+	return uuid.Parse(idString)
 }

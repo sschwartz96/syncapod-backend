@@ -3,13 +3,26 @@
 package grpc
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/sschwartz96/syncapod-backend/internal/db"
 	"github.com/sschwartz96/syncapod-backend/internal/podcast"
 	"github.com/sschwartz96/syncapod-backend/internal/protos"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func userFromDB(ur *db.UserRow) *protos.User {
+func convertUserEpiFromDB(u *db.UserEpisode) *protos.UserEpisode {
+	return &protos.UserEpisode{
+		UserID:    u.UserID.String(),
+		EpisodeID: u.UserID.String(),
+		Offset:    u.OffsetMillis,
+		LastSeen:  timestamppb.New(u.LastSeen),
+		Played:    u.Played,
+	}
+}
+
+func convertUserFromDB(ur *db.UserRow) *protos.User {
 	return &protos.User{
 		Id:       ur.ID.String(),
 		Email:    ur.Email,
@@ -27,7 +40,7 @@ func podcastFromDB(pr *db.Podcast, cats []podcast.Category) *protos.Podcast {
 		Category:      podCatsToProtoCats(cats),
 		Explicit:      pr.Explicit,
 		Image:         &protos.Image{Url: pr.ImageURL},
-		Keywords:      pr.Keywords,
+		Keywords:      strings.Split(strings.ReplaceAll(pr.Keywords, " ", ""), ","),
 		Language:      pr.Language,
 		LastBuildDate: timestamppb.New(pr.PubDate), // TODO: proper build date?
 		Link:          pr.LinkURL,
@@ -53,7 +66,28 @@ func episodeFromDB(er *db.Episode) *protos.Episode {
 		Explicit:       er.Explicit,
 		MP3URL:         er.EnclosureURL,
 		DurationMillis: er.Duration,
+		Encoded:        er.Encoded,
 	}
+}
+
+func convertPodsFromDB(podCon *podcast.PodController, p []db.Podcast) ([]*protos.Podcast, error) {
+	protoPods := make([]*protos.Podcast, len(p))
+	for i, _ := range p {
+		cats, err := podCon.ConvertCategories(p[i].Category)
+		if err != nil {
+			return nil, fmt.Errorf("Could not convert podcast categories: %v", err)
+		}
+		protoPods[i] = podcastFromDB(&p[i], cats)
+	}
+	return protoPods
+}
+
+func convertEpisFromDB(e []db.Episode) []*protos.Episode {
+	protoEpis := make([]*protos.Episode, len(e))
+	for i, _ := range p {
+		protoEpis[i] = episodeFromDB(&e[i])
+	}
+	return protoEpis
 }
 
 func podCatsToProtoCats(podCats []podcast.Category) []*protos.Category {

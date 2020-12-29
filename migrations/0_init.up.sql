@@ -55,7 +55,7 @@ CREATE TABLE Podcasts (
 	complete BOOLEAN,
 	-- RSS/OTHER
 	pub_date TIMESTAMPTZ,
-	keywords TEXT[],
+	keywords TEXT,
 	summary TEXT,
 	rss_url TEXT NOT NULL
 );
@@ -73,7 +73,7 @@ CREATE TABLE Episodes (
 	duration BIGINT,
 	link_url TEXT,
 	image_url TEXT,
-	image_text TEXT,
+	image_title TEXT,
 	explicit TEXT,
 	-- SITUATIONAL TAGS
 	episode INT,
@@ -83,7 +83,7 @@ CREATE TABLE Episodes (
 	-- OTHER
 	subtitle TEXT,
 	summary TEXT,
-	encoded TEXT,
+	encoded TEXT, -- this is the <content:encoded> which sometimes contains show notes
 	podcast_id UUID NOT NULL REFERENCES Podcasts(id) ON DELETE CASCADE
 );
 
@@ -94,8 +94,8 @@ CREATE TABLE Categories (
 );
 
 CREATE TABLE Subscriptions (
-	user_id UUID REFERENCES Users(id) ON DELETE CASCADE,
-	podcast_id UUID REFERENCES Podcasts(id) ON DELETE CASCADE,
+	user_id UUID REFERENCES Users(id) ON DELETE CASCADE NOT NULL,
+	podcast_id UUID REFERENCES Podcasts(id) ON DELETE CASCADE NOT NULL,
 	completed_ids UUID[],
 	in_progress_ids UUID[],
 	PRIMARY KEY(user_id,podcast_id)

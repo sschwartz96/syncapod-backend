@@ -29,7 +29,7 @@ func (a *AuthService) Authenticate(ctx context.Context, req *protos.Authenticate
 	}
 	return &protos.AuthenticateRes{
 		SessionKey: seshRow.ID.String(),
-		User:       protos.UserFromDB(userRow),
+		User:       convertUserFromDB(userRow),
 	}, nil
 }
 
@@ -44,7 +44,7 @@ func (a *AuthService) Authorize(ctx context.Context, req *protos.AuthorizeReq) (
 		return nil, status.Errorf(codes.Unauthenticated, "invalid session key")
 	}
 	return &protos.AuthorizeRes{
-		User: protos.UserFromDB(userRow),
+		User: convertUserFromDB(userRow),
 	}, nil
 }
 

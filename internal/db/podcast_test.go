@@ -12,22 +12,23 @@ import (
 
 var (
 	testPod     = &Podcast{ID: uuid.New(), Author: "Sam Schwartz", Description: "Syncapod Podcast", LinkURL: "https://syncapod.com/podcast", ImageURL: "http://syncapod.com/logo.png", Language: "en", Category: []int{1, 2, 3}, Explicit: "clean", RSSURL: "https://syncapod.com/podcast.rss"}
+	testPod2    = &Podcast{ID: uuid.New(), Author: "Sam Schwartz", Description: "Syncapod Podcast", LinkURL: "https://syncapod.com/podcast", ImageURL: "http://syncapod.com/logo.png", Language: "en", Category: []int{1, 2, 3}, Explicit: "clean", RSSURL: "https://syncapod.com/podcast.rss"}
 	testEpi     = &Episode{ID: uuid.New(), PodcastID: testPod.ID, Title: "Test Episode", Episode: 123, PubDate: time.Unix(1000, 0)}
 	testEpi2    = &Episode{ID: uuid.New(), PodcastID: testPod.ID, Title: "Test Episode 2", Episode: 124, PubDate: time.Unix(1001, 0)}
 	testUser    = &UserRow{ID: uuid.New(), Username: "dbTestUser", PasswordHash: []byte("shouldbehash")}
 	testUserEpi = &UserEpisode{EpisodeID: testEpi.ID, UserID: testUser.ID, LastSeen: time.Now(), OffsetMillis: 123456, Played: false}
+	testSub     = &Subscription{UserID: testUser.ID, PodcastID: testPod.ID, CompletedIDs: []uuid.UUID{testEpi.ID}, InProgressIDs: []uuid.UUID{testEpi2.ID}}
+	testSub2    = &Subscription{UserID: testUser.ID, PodcastID: testPod2.ID, CompletedIDs: []uuid.UUID{}, InProgressIDs: []uuid.UUID{}}
 )
 
 func setupPodcastDB() {
 	podStore := NewPodcastStore(testDB)
 	authStore := NewAuthStorePG(testDB)
-	err := podStore.InsertPodcast(context.Background(), testPod)
-	if err != nil {
-		log.Fatalf("db.setupPodcastDB() error: %v", err)
-	}
+	insertPodcastOrFail(podStore, testPod)
+	insertPodcastOrFail(podStore, testPod2)
 	insertEpisodeOrFail(podStore, testEpi)
 	insertEpisodeOrFail(podStore, testEpi2)
-	err = authStore.InsertUser(context.Background(), testUser)
+	err := authStore.InsertUser(context.Background(), testUser)
 	if err != nil {
 		log.Fatalf("db.setupPodcastDB() error: %v", err)
 	}
@@ -35,12 +36,30 @@ func setupPodcastDB() {
 	if err != nil {
 		log.Fatalf("db.setupPodcastDB() error: %v", err)
 	}
+	insertSubOrFail(podStore, testSub)
+	insertSubOrFail(podStore, testSub2)
+}
+
+func insertPodcastOrFail(podStore *PodcastStore, p *Podcast) {
+	err := podStore.InsertPodcast(context.Background(), p)
+	if err != nil {
+		log.Fatalf("db.insertPodcastOrFail() error: %v", err)
+	}
 }
 
 func insertEpisodeOrFail(podStore *PodcastStore, e *Episode) {
 	err := podStore.InsertEpisode(context.Background(), e)
 	if err != nil {
 		log.Fatalf("db.insertEpisodeOrFail() error: %v", err)
+	}
+}
+
+func insertSubOrFail(podStore *PodcastStore, s *Subscription) {
+	log.Println("inserting sub:", s)
+	err := podStore.InsertSubscription(context.Background(), s)
+	if err != nil {
+		time.Sleep(time.Minute)
+		log.Fatalf("db.insertSubOrFail() error: %v", err)
 	}
 }
 
@@ -161,7 +180,7 @@ func Test_FindLastUserEpi(t *testing.T) {
 	require.NotNil(t, userEpi)
 }
 
-func Test_FindLastUserPlayed(t *testing.T) {
+func Test_FindLastUserPlayedWithEpisode(t *testing.T) {
 	podStore := NewPodcastStore(testDB)
 	userEpi, pod, epi, err := podStore.FindLastPlayed(context.Background(), testUser.ID)
 	if err != nil {
@@ -194,4 +213,28 @@ func Test_FindEpisodesByRange(t *testing.T) {
 		t.Fatalf("Test_FindEpisodesByRange() error finding episodes: %v", err)
 	}
 	require.Equal(t, []Episode{*testEpi2, *testEpi}, epis)
+}
+
+func Test_InsAndDelSubscription(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	p := &Podcast{ID: uuid.New(), Category: []int{1, 2}}
+	insertPodcastOrFail(podStore, p)
+	s := &Subscription{UserID: testUser.ID, PodcastID: p.ID}
+	err := podStore.InsertSubscription(context.Background(), s)
+	if err != nil {
+		t.Fatalf("Test_InsAndDelSubscription() error inserting subscription: %v", err)
+	}
+	err = podStore.DeleteSubscription(context.Background(), s.UserID, s.PodcastID)
+	if err != nil {
+		t.Fatalf("Test_InsAndDelSubscription() error deleting subscription: %v", err)
+	}
+}
+
+func Test_FindSubscriptions(t *testing.T) {
+	podStore := NewPodcastStore(testDB)
+	subs, err := podStore.FindSubscriptions(context.Background(), testUser.ID)
+	if err != nil {
+		t.Fatalf("Test_FindSubscriptions() error finding subscriptions: %v", err)
+	}
+	require.Equal(t, []Subscription{*testSub, *testSub2}, subs)
 }
