@@ -40,7 +40,7 @@ func (p *PodcastService) GetPodcast(ctx context.Context, req *protos.Request) (*
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not convert category ids: %v", err)
 	}
-	pod := podcastFromDB(dbPod, podCat)
+	pod := convertPodFromDB(dbPod, podCat)
 	return pod, nil
 }
 
@@ -108,14 +108,13 @@ func (p *PodcastService) GetSubscriptions(ctx context.Context, req *protos.Reque
 	if err != nil {
 		return nil, fmt.Errorf("GetSubscriptions() error getting user id: %v", err)
 	}
-
-	subs, err := p.podCon.FindSubscriptions(p.dbClient, userID)
+	subs, err := p.podCon.FindSubscriptions(ctx, userID)
 	if err != nil {
 		log.Println("GetSubscriptions() error getting subs:", err)
 		return &protos.Subscriptions{}, nil
 	}
 
-	return &protos.Subscriptions{Subscriptions: subs}, nil
+	return &protos.Subscriptions{Subscriptions: convertSubFromDB(subs)}, nil
 }
 
 // GetUserLastPlayed returns the last episode the user was playing & metadata
@@ -125,26 +124,29 @@ func (p *PodcastService) GetUserLastPlayed(ctx context.Context, req *protos.Requ
 		return nil, fmt.Errorf("GetUserLastPlayed() error getting user id: %v", err)
 	}
 
-	pod, epi, userEpi, err := user.FindUserLastPlayed(p.dbClient, userID)
+	userEpi, pod, epi, err := p.podCon.FindLastPlayed(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("GetUserLastPlayed() error: %v", err)
 	}
-
+	cats, err := p.podCon.ConvertCategories(pod.Category)
+	if err != nil {
+		return nil, fmt.Errorf("GetUserLastPlayed() error converting categories: %v", err)
+	}
 	return &protos.LastPlayedRes{
-		Podcast: pod,
-		Episode: epi,
-		Millis:  userEpi.Offset,
+		Podcast: convertPodFromDB(pod, cats),
+		Episode: convertEpiFromDB(epi),
+		Millis:  userEpi.OffsetMillis,
 	}, nil
 }
 
 func getUserIDFromContext(ctx context.Context) (uuid.UUID, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return nil, fmt.Errorf("getUserIDFromContext() error: metadata not valid")
+		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error: metadata not valid")
 	}
-	idString := md.Get("user_id")
+	idString := md.Get("user_id")[0]
 	if len(idString) == 0 {
-		return nil, fmt.Errorf("getUserIDFromContext() error: no user id")
+		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error: no user id")
 	}
 	return uuid.Parse(idString)
 }

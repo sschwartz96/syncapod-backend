@@ -77,7 +77,7 @@ func main() {
 	// setup & start gRPC server
 	grpcServer := sGRPC.NewServer(certMan,
 		sGRPC.NewAuthService(authController),
-		sGRPC.NewPodcastService(),
+		sGRPC.NewPodcastService(podController),
 	)
 	go func() {
 		// setup listener

@@ -81,6 +81,10 @@ func TestMain(m *testing.M) {
 	// run tests
 	runCode := m.Run()
 
+	err = cleanupDB()
+	if err != nil {
+		log.Println("grpc.auth_test, error cleaning up db:", err)
+	}
 	testDB.Close()
 
 	os.Exit(runCode)
@@ -91,6 +95,15 @@ func setupDB() error {
 	err := authStore.InsertUser(context.Background(), testUser)
 	if err != nil {
 		return fmt.Errorf("failed to insert user: %v", err)
+	}
+	return nil
+}
+
+func cleanupDB() error {
+	authStore := db.NewAuthStorePG(testDB)
+	err := authStore.DeleteUser(context.Background(), testUser.ID)
+	if err != nil {
+		return err
 	}
 	return nil
 }

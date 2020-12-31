@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/sschwartz96/syncapod-backend/internal/db"
 	"github.com/sschwartz96/syncapod-backend/internal/podcast"
 	"github.com/sschwartz96/syncapod-backend/internal/protos"
@@ -31,7 +32,7 @@ func convertUserFromDB(ur *db.UserRow) *protos.User {
 	}
 }
 
-func podcastFromDB(pr *db.Podcast, cats []podcast.Category) *protos.Podcast {
+func convertPodFromDB(pr *db.Podcast, cats []podcast.Category) *protos.Podcast {
 	return &protos.Podcast{
 		Id:            pr.ID.String(),
 		Title:         pr.Title,
@@ -50,7 +51,7 @@ func podcastFromDB(pr *db.Podcast, cats []podcast.Category) *protos.Podcast {
 	}
 }
 
-func episodeFromDB(er *db.Episode) *protos.Episode {
+func convertEpiFromDB(er *db.Episode) *protos.Episode {
 	return &protos.Episode{
 		Id:             er.ID.String(),
 		PodcastID:      er.PodcastID.String(),
@@ -77,15 +78,15 @@ func convertPodsFromDB(podCon *podcast.PodController, p []db.Podcast) ([]*protos
 		if err != nil {
 			return nil, fmt.Errorf("Could not convert podcast categories: %v", err)
 		}
-		protoPods[i] = podcastFromDB(&p[i], cats)
+		protoPods[i] = convertPodFromDB(&p[i], cats)
 	}
-	return protoPods
+	return protoPods, nil
 }
 
 func convertEpisFromDB(e []db.Episode) []*protos.Episode {
 	protoEpis := make([]*protos.Episode, len(e))
-	for i, _ := range p {
-		protoEpis[i] = episodeFromDB(&e[i])
+	for i, _ := range e {
+		protoEpis[i] = convertEpiFromDB(&e[i])
 	}
 	return protoEpis
 }
@@ -103,4 +104,25 @@ func podCatToProtoCat(podCat podcast.Category) *protos.Category {
 		Category: podCatsToProtoCats(podCat.Subcategories),
 		Text:     podCat.Name,
 	}
+}
+
+func convertSubFromDB(s []db.Subscription) []*protos.Subscription {
+	subs := []*protos.Subscription{}
+	for i, _ := range s {
+		subs = append(subs, &protos.Subscription{
+			UserID:        s[i].UserID.String(),
+			PodcastID:     s[i].PodcastID.String(),
+			CompletedIDs:  convertUUIDsToStrings(s[i].CompletedIDs),
+			InProgressIDs: convertUUIDsToStrings(s[i].InProgressIDs),
+		})
+	}
+	return subs
+}
+
+func convertUUIDsToStrings(u []uuid.UUID) []string {
+	s := []string{}
+	for i, _ := range u {
+		s = append(s, u[i].String())
+	}
+	return s
 }
