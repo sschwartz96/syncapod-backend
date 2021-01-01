@@ -17,10 +17,18 @@ func Test_RSS(t *testing.T) {
 		t.Fatalf("Test_RSS error setting up: %v", err)
 	}
 	rssController := NewRSSController(podController)
-	gotimeURL := "https://changelog.com/gotime/feed"
+	//rssURL := "https://changelog.com/gotime/feed"
+	rssURL := "https://feeds.twit.tv/twit.xml"
+
+	// download from the internet first
+	r, err := DownloadRSS(rssURL)
+	if err != nil {
+		t.Fatalf("Test_RSS() error downloading rss")
+	}
+	defer r.Close()
 
 	// test add the podcast
-	podID, err := rssController.AddNewPodcast(gotimeURL)
+	podID, err := rssController.AddNewPodcast(rssURL, r)
 	if err != nil {
 		t.Fatalf("Test_RSS() error adding new podcast: %v", err)
 	}
@@ -51,7 +59,7 @@ func Test_RSS(t *testing.T) {
 		t.Fatalf("Test_RSS() error finding latest episode(2): %v", err)
 	}
 	epi2.ID = epi.ID
-	require.Equal(t, epi, epi2)
+	require.Equal(t, *epi, *epi2)
 }
 
 func Test_parseDuration(t *testing.T) {

@@ -45,6 +45,13 @@ func TestMain(m *testing.M) {
 	// run tests
 	runCode := m.Run()
 
+	// cleanup database
+	testDB.Exec(context.Background(), "DELETE FROM Users")
+	testDB.Exec(context.Background(), "DELETE FROM Sessions")
+	testDB.Exec(context.Background(), "DELETE FROM Podcasts")
+	testDB.Exec(context.Background(), "DELETE FROM Episodes")
+	testDB.Exec(context.Background(), "DELETE FROM Subscriptions")
+
 	testDB.Close()
 
 	os.Exit(runCode)
