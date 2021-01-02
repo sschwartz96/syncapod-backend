@@ -33,14 +33,6 @@ var (
 		PasswordHash: []byte("$2y$12$ndywn/c6wcB0oPv1ZRMLgeSQjTpXzOUCQy.5vdYvJxO9CS644i6Ce"),
 		Created:      time.Unix(0, 0), LastSeen: time.Unix(0, 0),
 	}
-	// for podcast_test
-	testPod     = &db.Podcast{ID: uuid.New(), Author: "Sam Schwartz", Description: "Syncapod Podcast", LinkURL: "https://syncapod.com/podcast", ImageURL: "http://syncapod.com/logo.png", Language: "en", Category: []int{1, 2, 3}, Explicit: "clean", RSSURL: "https://syncapod.com/podcast.rss"}
-	testPod2    = &db.Podcast{ID: uuid.New(), Author: "Simon Schwartz", Description: "Syncapod Podcast 2", LinkURL: "https://syncapod.com/podcast2", ImageURL: "http://syncapod.com/logo.png", Language: "en", Category: []int{1, 2, 3}, Explicit: "explicit", RSSURL: "https://syncapod.com/podcast2.rss"}
-	testEpi     = &db.Episode{ID: uuid.New(), PodcastID: testPod.ID, Title: "Test Episode", Episode: 123, PubDate: time.Unix(1000, 0)}
-	testEpi2    = &db.Episode{ID: uuid.New(), PodcastID: testPod.ID, Title: "Test Episode 2", Episode: 124, PubDate: time.Unix(1001, 0)}
-	testUserEpi = &db.UserEpisode{EpisodeID: testEpi.ID, UserID: testUser.ID, LastSeen: time.Now(), OffsetMillis: 123456, Played: false}
-	testSub     = &db.Subscription{UserID: testUser.ID, PodcastID: testPod.ID, CompletedIDs: []uuid.UUID{testEpi.ID}, InProgressIDs: []uuid.UUID{testEpi2.ID}}
-	testSub2    = &db.Subscription{UserID: testUser.ID, PodcastID: testPod2.ID, CompletedIDs: []uuid.UUID{}, InProgressIDs: []uuid.UUID{}}
 )
 
 func bufDialer(context.Context, string) (net.Conn, error) {
@@ -64,9 +56,13 @@ func TestMain(m *testing.M) {
 	}
 
 	// setup db
-	err = setupDB()
+	err = setupAuthDB()
 	if err != nil {
-		log.Fatalf("grpc.TestMain() error setting up database")
+		log.Fatalf("grpc.TestMain() error setting up auth database")
+	}
+	err = setupPodDB()
+	if err != nil {
+		log.Fatalf("grpc.TestMain() error setting up podcast database")
 	}
 
 	// setup grpc server
@@ -95,41 +91,20 @@ func TestMain(m *testing.M) {
 	// run tests
 	runCode := m.Run()
 
-	err = cleanupDB()
-	if err != nil {
-		log.Println("grpc.auth_test, error cleaning up db:", err)
-	}
+	cleanupDB()
+
 	testDB.Close()
 
 	os.Exit(runCode)
 }
 
-func setupDB() error {
+func setupAuthDB() error {
 	authStore := db.NewAuthStorePG(testDB)
-	podStore := db.NewPodcastStore(testDB)
 	err := authStore.InsertUser(context.Background(), testUser)
 	if err != nil {
 		return fmt.Errorf("failed to insert user: %v", err)
 	}
-	// for podcast_test
-	if err = podStore.InsertPodcast(context.Background(), testPod); err != nil {
-		return fmt.Errorf("failed to insert podcast: %v", err)
-	}
-	if err = podStore.InsertPodcast(context.Background(), testPod2); err != nil {
-		return fmt.Errorf("failed to insert podcast: %v", err)
-	}
-	if err = podStore.InsertEpisode(context.Background(), testEpi); err != nil {
-		return fmt.Errorf("failed to insert episode: %v", err)
-	}
-	if err = podStore.InsertEpisode(context.Background(), testEpi2); err != nil {
-		return fmt.Errorf("failed to insert episode: %v", err)
-	}
-	if err = podStore.InsertSubscription(context.Background(), testSub); err != nil {
-		return fmt.Errorf("failed to insert sub: %v", err)
-	}
-	if err = podStore.InsertSubscription(context.Background(), testSub2); err != nil {
-		return fmt.Errorf("failed to insert sub: %v", err)
-	}
+
 	return nil
 }
 

@@ -73,7 +73,7 @@ func convertEpiFromDB(er *db.Episode) *protos.Episode {
 
 func convertPodsFromDB(podCon *podcast.PodController, p []db.Podcast) ([]*protos.Podcast, error) {
 	protoPods := make([]*protos.Podcast, len(p))
-	for i, _ := range p {
+	for i := range p {
 		cats, err := podCon.ConvertCategories(p[i].Category)
 		if err != nil {
 			return nil, fmt.Errorf("Could not convert podcast categories: %v", err)
@@ -85,7 +85,7 @@ func convertPodsFromDB(podCon *podcast.PodController, p []db.Podcast) ([]*protos
 
 func convertEpisFromDB(e []db.Episode) []*protos.Episode {
 	protoEpis := make([]*protos.Episode, len(e))
-	for i, _ := range e {
+	for i := range e {
 		protoEpis[i] = convertEpiFromDB(&e[i])
 	}
 	return protoEpis
@@ -93,7 +93,7 @@ func convertEpisFromDB(e []db.Episode) []*protos.Episode {
 
 func podCatsToProtoCats(podCats []podcast.Category) []*protos.Category {
 	protoCats := []*protos.Category{}
-	for i, _ := range podCats {
+	for i := range podCats {
 		protoCats = append(protoCats, podCatToProtoCat(podCats[i]))
 	}
 	return protoCats
@@ -108,7 +108,7 @@ func podCatToProtoCat(podCat podcast.Category) *protos.Category {
 
 func convertSubFromDB(s []db.Subscription) []*protos.Subscription {
 	subs := []*protos.Subscription{}
-	for i, _ := range s {
+	for i := range s {
 		subs = append(subs, &protos.Subscription{
 			UserID:        s[i].UserID.String(),
 			PodcastID:     s[i].PodcastID.String(),
@@ -121,7 +121,7 @@ func convertSubFromDB(s []db.Subscription) []*protos.Subscription {
 
 func convertUUIDsToStrings(u []uuid.UUID) []string {
 	s := []string{}
-	for i, _ := range u {
+	for i := range u {
 		s = append(s, u[i].String())
 	}
 	return s

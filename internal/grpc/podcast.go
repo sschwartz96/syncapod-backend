@@ -27,8 +27,8 @@ func NewPodcastService(podCon *podcast.PodController) *PodcastService {
 }
 
 // GetPodcast returns a podcast via id
-func (p *PodcastService) GetPodcast(ctx context.Context, req *protos.Request) (*protos.Podcast, error) {
-	pid, err := uuid.Parse(req.PodcastID)
+func (p *PodcastService) GetPodcast(ctx context.Context, req *protos.GetPodReq) (*protos.Podcast, error) {
+	pid, err := uuid.Parse(req.Id)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Could not parse podcast id: %v", err)
 	}
@@ -45,8 +45,8 @@ func (p *PodcastService) GetPodcast(ctx context.Context, req *protos.Request) (*
 }
 
 // GetEpisodes returns a list of episodes via podcast id
-func (p *PodcastService) GetEpisodes(ctx context.Context, req *protos.Request) (*protos.Episodes, error) {
-	podID, err := uuid.Parse(req.PodcastID)
+func (p *PodcastService) GetEpisodes(ctx context.Context, req *protos.GetEpiReq) (*protos.Episodes, error) {
+	podID, err := uuid.Parse(req.Id)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "Could not parse podcast UUID")
 	}
@@ -59,12 +59,12 @@ func (p *PodcastService) GetEpisodes(ctx context.Context, req *protos.Request) (
 }
 
 // GetUserEpisode returns the user playback metadata via episode id & user id
-func (p *PodcastService) GetUserEpisode(ctx context.Context, req *protos.Request) (*protos.UserEpisode, error) {
+func (p *PodcastService) GetUserEpisode(ctx context.Context, req *protos.GetUserEpiReq) (*protos.UserEpisode, error) {
 	userID, err := getUserIDFromContext(ctx)
 	if err != nil {
 		return nil, status.Error(codes.FailedPrecondition, "User not authenticated")
 	}
-	epiID, err := uuid.Parse(req.EpisodeID)
+	epiID, err := uuid.Parse(req.EpiID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "Could not parse episode uuid")
 	}
@@ -76,24 +76,24 @@ func (p *PodcastService) GetUserEpisode(ctx context.Context, req *protos.Request
 }
 
 // UpdateUserEpisode updates the user playback metadata via episode id & user id
-func (p *PodcastService) UpdateUserEpisode(ctx context.Context, req *protos.UserEpisodeReq) (*protos.Response, error) {
+func (p *PodcastService) UpdateUserEpisode(ctx context.Context, userEpiReq *protos.UserEpisode) (*protos.Response, error) {
 	userID, err := getUserIDFromContext(ctx)
 	if err != nil {
 		return nil, status.Error(codes.FailedPrecondition, "User not authenticated")
 	}
-	epiID, err := uuid.Parse(req.EpisodeID)
+	epiID, err := uuid.Parse(userEpiReq.EpisodeID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "Could not parse episode UUID")
 	}
-	if req.LastSeen == nil {
-		req.LastSeen = ptypes.TimestampNow()
+	if userEpiReq.LastSeen == nil {
+		userEpiReq.LastSeen = ptypes.TimestampNow()
 	}
 	userEpi := &db.UserEpisode{
 		UserID:       userID,
 		EpisodeID:    epiID,
-		OffsetMillis: req.Offset,
-		LastSeen:     req.LastSeen.AsTime(),
-		Played:       req.Played,
+		OffsetMillis: userEpiReq.Offset,
+		LastSeen:     userEpiReq.LastSeen.AsTime(),
+		Played:       userEpiReq.Played,
 	}
 	err = p.podCon.UpsertUserEpisode(ctx, userEpi)
 	if err != nil {
@@ -103,7 +103,7 @@ func (p *PodcastService) UpdateUserEpisode(ctx context.Context, req *protos.User
 }
 
 // GetSubscriptions returns a list of podcasts via user id
-func (p *PodcastService) GetSubscriptions(ctx context.Context, req *protos.Request) (*protos.Subscriptions, error) {
+func (p *PodcastService) GetSubscriptions(ctx context.Context, req *protos.GetSubReq) (*protos.Subscriptions, error) {
 	userID, err := getUserIDFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("GetSubscriptions() error getting user id: %v", err)
@@ -118,7 +118,7 @@ func (p *PodcastService) GetSubscriptions(ctx context.Context, req *protos.Reque
 }
 
 // GetUserLastPlayed returns the last episode the user was playing & metadata
-func (p *PodcastService) GetUserLastPlayed(ctx context.Context, req *protos.Request) (*protos.LastPlayedRes, error) {
+func (p *PodcastService) GetUserLastPlayed(ctx context.Context, req *protos.GetUserLastPlayedReq) (*protos.LastPlayedRes, error) {
 	userID, err := getUserIDFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("GetUserLastPlayed() error getting user id: %v", err)

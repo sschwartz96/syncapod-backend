@@ -24,7 +24,7 @@ clean:
 	rm main
 
 test:
-	docker run -d --rm -ti --name pg_test -p 5432:5432 -e POSTGRES_PASSWORD=secret postgres
+	docker run -d --rm -ti --name pg_test --expose 5432 -e POSTGRES_PASSWORD=secret postgres
 	sleep 1.5 # wait enough time to run migrations
 	migrate  -source file://migrations \
 		-database postgres://postgres:secret@localhost/postgres?sslmode=disable up
@@ -52,7 +52,7 @@ coverage:
 	go test ./... -cover; docker stop pg_test -t 1
 
 protos:
-	protoc -I=/home/sam/projects/syncapod/syncapod-protos/ \
+	protoc -I ~/projects/syncapod/syncapod-protos/ \
 		--go_out=internal/protos/ \
 		--go-grpc_out=internal/protos/ \
-		/home/sam/projects/syncapod/syncapod-protos/*
+		~/projects/syncapod/syncapod-protos/*
