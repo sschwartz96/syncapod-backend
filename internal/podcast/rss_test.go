@@ -11,7 +11,7 @@ import (
 )
 
 func Test_RSS(t *testing.T) {
-	podStore := db.NewPodcastStore(testDB)
+	podStore := db.NewPodcastStore(dbpg)
 	podController, err := NewPodController(podStore)
 	if err != nil {
 		t.Fatalf("Test_RSS error setting up: %v", err)
@@ -40,7 +40,7 @@ func Test_RSS(t *testing.T) {
 	}
 
 	// delete the last episode to air
-	_, err = testDB.Exec(context.Background(),
+	_, err = dbpg.Exec(context.Background(),
 		`DELETE FROM Episodes
 		WHERE id=any(array(SELECT id FROM Episodes ORDER BY pub_date DESC LIMIT 1))`)
 	if err != nil {

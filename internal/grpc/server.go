@@ -24,9 +24,9 @@ type Server struct {
 	authC  *auth.AuthController
 }
 
-func NewServer(a *autocert.Manager, aS protos.AuthServer, pS protos.PodServer) *Server {
+func NewServer(a *autocert.Manager, aC *auth.AuthController, aS protos.AuthServer, pS protos.PodServer) *Server {
 	var grpcServer *grpc.Server
-	s := &Server{}
+	s := &Server{authC: aC}
 	// setup server
 	gOptCreds := getCredsOpt(a)
 	gOptInter := grpc.UnaryInterceptor(s.Intercept())
@@ -44,12 +44,15 @@ func (s *Server) Start(lis net.Listener) error {
 }
 
 func getCredsOpt(a *autocert.Manager) grpc.ServerOption {
-	tlsConfig := &tls.Config{GetCertificate: a.GetCertificate}
-	return grpc.Creds(
-		credentials.NewTLS(
-			tlsConfig,
-		),
-	)
+	if a != nil {
+		tlsConfig := &tls.Config{GetCertificate: a.GetCertificate}
+		return grpc.Creds(
+			credentials.NewTLS(
+				tlsConfig,
+			),
+		)
+	}
+	return grpc.EmptyServerOption{}
 }
 
 func (s *Server) Intercept() grpc.UnaryServerInterceptor {

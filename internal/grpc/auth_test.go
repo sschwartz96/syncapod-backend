@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/sschwartz96/syncapod-backend/internal"
 	"github.com/sschwartz96/syncapod-backend/internal/auth"
 	"github.com/sschwartz96/syncapod-backend/internal/db"
 	"github.com/sschwartz96/syncapod-backend/internal/podcast"
@@ -25,7 +25,7 @@ const bufSize = 1024 * 1024
 
 var (
 	lis      *bufconn.Listener
-	testDB   *pgxpool.Pool
+	dbpg     *pgxpool.Pool
 	testUser = &db.UserRow{
 		ID:    uuid.MustParse("b921c6e3-9cd0-4aed-9c4e-1d88ae20c777"),
 		Email: "user@grpc.test", Username: "user_grpc_test",
@@ -40,50 +40,38 @@ func bufDialer(context.Context, string) (net.Conn, error) {
 }
 
 func TestMain(m *testing.M) {
-	// connect stop after 5 seconds
-	start := time.Now()
-	fiveSec := time.Second * 5
-	err := errors.New("start loop")
-	for err != nil {
-		if time.Since(start) > fiveSec {
-			log.Fatal(`Could not connect to postgres\n
-				Took longer than 5 seconds, maybe download postgres image`)
-		}
-		testDB, err = pgxpool.Connect(context.Background(),
-			"postgres://postgres:secret@localhost:5432/postgres?sslmode=disable",
-		)
-		time.Sleep(time.Millisecond * 250)
+	var dockerCleanFunc func() error
+	var err error
+	dbpg, dockerCleanFunc, err = internal.StartDockerDB("db_auth")
+	if err != nil {
+		log.Fatalf("auth.TestMain() error setting up docker db: %v", err)
 	}
 
 	// setup db
 	err = setupAuthDB()
 	if err != nil {
-		log.Fatalf("grpc.TestMain() error setting up auth database")
+		log.Fatalf("grpc.TestMain() error setting up auth database: %v", err)
 	}
 	err = setupPodDB()
 	if err != nil {
-		log.Fatalf("grpc.TestMain() error setting up podcast database")
+		log.Fatalf("grpc.TestMain() error setting up podcast database: %v", err)
 	}
 
 	// setup grpc server
 	lis = bufconn.Listen(bufSize)
-	s := grpc.NewServer()
-	protos.RegisterAuthServer(s,
-		NewAuthService(
-			auth.NewAuthController(db.NewAuthStorePG(testDB),
-				db.NewOAuthStorePG(testDB),
-			),
-		),
-	)
-	podCon, err := podcast.NewPodController(db.NewPodcastStore(testDB))
+	podCon, err := podcast.NewPodController(db.NewPodcastStore(dbpg))
+	authCon := auth.NewAuthController(db.NewAuthStorePG(dbpg), db.NewOAuthStorePG(dbpg))
 	if err != nil {
-		log.Fatalf("grpc.TestMain() failed to create podController: %v", err)
+		log.Fatalf("grpc.TestMain() error setting up pod controller: %v", err)
 	}
-	protos.RegisterPodServer(s,
+	grpcServer := NewServer(nil,
+		authCon,
+		NewAuthService(authCon),
 		NewPodcastService(podCon),
 	)
+	//s := grpc.NewServer()
 	go func() {
-		if err := s.Serve(lis); err != nil {
+		if err := grpcServer.Start(lis); err != nil {
 			log.Fatalf("gRPC test server exited with error: %v", err)
 		}
 	}()
@@ -91,29 +79,33 @@ func TestMain(m *testing.M) {
 	// run tests
 	runCode := m.Run()
 
-	cleanupDB()
+	// close pgx pool
+	dbpg.Close()
 
-	testDB.Close()
+	// cleanup docker container
+	err = dockerCleanFunc()
+	if err != nil {
+		log.Fatalf("grpc.TestMain() error cleaning up docker container: %v", err)
+	}
 
 	os.Exit(runCode)
 }
 
 func setupAuthDB() error {
-	authStore := db.NewAuthStorePG(testDB)
+	authStore := db.NewAuthStorePG(dbpg)
 	err := authStore.InsertUser(context.Background(), testUser)
 	if err != nil {
 		return fmt.Errorf("failed to insert user: %v", err)
 	}
-
 	return nil
 }
 
-func cleanupDB() {
-	testDB.Exec(context.Background(), "DELETE FROM Users")
-	testDB.Exec(context.Background(), "DELETE FROM Sessions")
-	testDB.Exec(context.Background(), "DELETE FROM Podcasts")
-	testDB.Exec(context.Background(), "DELETE FROM Episodes")
-	testDB.Exec(context.Background(), "DELETE FROM Subscriptions")
+func dbDeleteOrFail(table string) {
+	_, err := dbpg.Exec(context.Background(),
+		fmt.Sprintf("DELETE FROM %v", table))
+	if err != nil {
+		log.Fatalf("dbDeleteOrFail() could not delete rows of table: %v", err)
+	}
 }
 
 func TestAuthGRPC(t *testing.T) {

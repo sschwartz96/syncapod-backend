@@ -200,8 +200,8 @@ func (p *PodcastStore) UpsertUserEpisode(ctx context.Context, userEpi *UserEpiso
 		`INSERT INTO UserEpisodes
 		(user_id,episode_id,offset_millis,last_seen,played)
 		VALUES($1,$2,$3,$4,$5)
-		ON CONFLICT(user_id,episode_id)
-		DO UPDATE SET offset_millis=EXCLUDED.offset_millis,last_seen=EXCLUDED.last_seen,played=EXCLUDED.played`,
+		ON CONFLICT (user_id,episode_id) DO UPDATE
+		SET offset_millis=$3,last_seen=$4,played=$5`,
 		&userEpi.UserID, &userEpi.EpisodeID, &userEpi.OffsetMillis, &userEpi.LastSeen, &userEpi.Played,
 	)
 	if err != nil {

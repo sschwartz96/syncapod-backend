@@ -3,13 +3,6 @@
 db:
 	docker run -d --rm -ti --network host -e POSTGRES_PASSWORD=secret postgres
 
-testdb:
-	docker run -d --rm -ti --name pg_test --network host -e POSTGRES_PASSWORD=secret postgres
-	sleep 1.5 # wait enough time to run migrations
-	migrate  -source file://migrations \
-		-database postgres://postgres:secret@localhost/postgres?sslmode=disable up
-	richgo test ./internal/db; docker stop pg_test -t 1
-
 migrate:
 	migrate -source file://migrations \
 		-database postgres://postgres:secret@localhost/postgres?sslmode=disable up
@@ -21,35 +14,17 @@ build:
 	go build ./cmd/main.go
 
 clean:
-	rm main
+	rm main -f
+	go clean -testcache
 
 test:
-	docker run -d --rm -ti --name pg_test --expose 5432 -e POSTGRES_PASSWORD=secret postgres
-	sleep 1.5 # wait enough time to run migrations
-	migrate  -source file://migrations \
-		-database postgres://postgres:secret@localhost/postgres?sslmode=disable up
-	go test ./...; docker stop pg_test -t 1
+	go test ./...
 
 testv:
-	docker run -d --rm -ti --name pg_test -p 5432:5432 -e POSTGRES_PASSWORD=secret postgres
-	sleep 1.75 # wait enough time to run migrations
-	migrate  -source file://migrations \
-		-database postgres://postgres:secret@localhost/postgres?sslmode=disable up
-	richgo test ./... -v; docker stop pg_test -t 1
-
-testpod:
-	docker run -d --rm -ti --name pg_test -p 5432:5432 -e POSTGRES_PASSWORD=secret postgres
-	sleep 1.75 # wait enough time to run migrations
-	migrate  -source file://migrations \
-		-database postgres://postgres:secret@localhost/postgres?sslmode=disable up
-	richgo test ./internal/podcast -v; docker stop pg_test -t 1
+	go test ./... -v
 
 coverage:
-	docker run -d --rm -ti --name pg_test -p 5432:5432 -e POSTGRES_PASSWORD=secret postgres
-	sleep 2.0 # wait enough time to run migrations
-	migrate  -source file://migrations \
-		-database postgres://postgres:secret@localhost/postgres?sslmode=disable up
-	go test ./... -cover; docker stop pg_test -t 1
+	go test ./... -cover
 
 protos:
 	protoc -I ~/projects/syncapod/syncapod-protos/ \

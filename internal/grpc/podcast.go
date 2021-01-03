@@ -75,8 +75,8 @@ func (p *PodcastService) GetUserEpisode(ctx context.Context, req *protos.GetUser
 	return convertUserEpiFromDB(dbUserEpi), nil
 }
 
-// UpdateUserEpisode updates the user playback metadata via episode id & user id
-func (p *PodcastService) UpdateUserEpisode(ctx context.Context, userEpiReq *protos.UserEpisode) (*protos.Response, error) {
+// UpsertUserEpisode updates the user playback metadata via episode id & user id
+func (p *PodcastService) UpsertUserEpisode(ctx context.Context, userEpiReq *protos.UserEpisode) (*protos.Response, error) {
 	userID, err := getUserIDFromContext(ctx)
 	if err != nil {
 		return nil, status.Error(codes.FailedPrecondition, "User not authenticated")
@@ -97,7 +97,7 @@ func (p *PodcastService) UpdateUserEpisode(ctx context.Context, userEpiReq *prot
 	}
 	err = p.podCon.UpsertUserEpisode(ctx, userEpi)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "Error upserting user epi")
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Error upserting user epi: %v", err))
 	}
 	return &protos.Response{Success: true, Message: ""}, nil
 }
@@ -144,9 +144,13 @@ func getUserIDFromContext(ctx context.Context) (uuid.UUID, error) {
 	if !ok {
 		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error: metadata not valid")
 	}
-	idString := md.Get("user_id")[0]
-	if len(idString) == 0 {
+	mData := md.Get("user_id")
+	if len(mData) == 0 {
 		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error: no user id")
+	}
+	idString := mData[0]
+	if len(idString) == 0 {
+		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error: id is length of 0")
 	}
 	return uuid.Parse(idString)
 }

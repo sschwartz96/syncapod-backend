@@ -22,8 +22,8 @@ var (
 )
 
 func setupPodcastDB() {
-	podStore := NewPodcastStore(testDB)
-	authStore := NewAuthStorePG(testDB)
+	podStore := NewPodcastStore(dbpg)
+	authStore := NewAuthStorePG(dbpg)
 	insertPodcastOrFail(podStore, testPod)
 	insertPodcastOrFail(podStore, testPod2)
 	insertEpisodeOrFail(podStore, testEpi)
@@ -64,7 +64,7 @@ func insertSubOrFail(podStore *PodcastStore, s *Subscription) {
 }
 
 func Test_FindPodcast(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	pod, err := podStore.FindPodcastByID(context.Background(), testPod.ID)
 	if err != nil {
 		t.Fatalf("Test_FindPodcast() error: %v", err)
@@ -73,7 +73,7 @@ func Test_FindPodcast(t *testing.T) {
 }
 
 func Test_FindPodcastByRSS(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	pod, err := podStore.FindPodcastByRSS(context.Background(), testPod.RSSURL)
 	if err != nil {
 		t.Fatalf("Test_FindPodcastRSS() error: %v", err)
@@ -82,7 +82,7 @@ func Test_FindPodcastByRSS(t *testing.T) {
 }
 
 func Test_FindPodcastsByRange(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	pods, err := podStore.FindPodcastsByRange(context.Background(), 0, 1)
 	if err != nil {
 		t.Fatalf("Test_FindPodcastRSS() error: %v", err)
@@ -91,7 +91,7 @@ func Test_FindPodcastsByRange(t *testing.T) {
 }
 
 func Test_InsertPodcast(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	pod := &Podcast{ID: uuid.New(), Author: "Sam Schwartz", Description: "Test Insert Podcast", LinkURL: "https://syncapod.com/podcast", ImageURL: "http://syncapod.com/logo.png", Language: "en", Category: []int{1, 2, 3}, Explicit: "clean", RSSURL: "https://syncapod.com/podcast_test.rss"}
 	err := podStore.InsertPodcast(context.Background(), pod)
 	if err != nil {
@@ -100,7 +100,7 @@ func Test_InsertPodcast(t *testing.T) {
 }
 
 func Test_FindLatestEpisode(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	epi, err := podStore.FindLatestEpisode(context.Background(), testPod.ID)
 	if err != nil {
 		t.Fatalf("Test_FindLatestEpisode() error: %v", err)
@@ -109,7 +109,7 @@ func Test_FindLatestEpisode(t *testing.T) {
 }
 
 func Test_FindEpisodeByID(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	epi, err := podStore.FindEpisodeByID(context.Background(), testEpi.ID)
 	if err != nil {
 		t.Fatalf("Test_FindEpisodeByID() error: %v", err)
@@ -118,7 +118,7 @@ func Test_FindEpisodeByID(t *testing.T) {
 }
 
 func Test_FindEpisodeByURL(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	epi, err := podStore.FindEpisodeByURL(context.Background(), testPod.ID, testEpi.EnclosureURL)
 	if err != nil {
 		t.Fatalf("Test_FindEpisodeByURL() error: %v", err)
@@ -127,7 +127,7 @@ func Test_FindEpisodeByURL(t *testing.T) {
 }
 
 func Test_FindEpisodeNumber(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 
 	epiFound, err := podStore.FindEpisodeNumber(context.Background(), testEpi.PodcastID, 0, 123)
 	if err != nil {
@@ -137,7 +137,7 @@ func Test_FindEpisodeNumber(t *testing.T) {
 }
 
 func Test_SearchPodcasts(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	pod := &Podcast{ID: uuid.New(), Author: "Sam Schwartz", Description: "PostgreSQL Search Test", LinkURL: "https://syncapod.com/podcast", ImageURL: "http://syncapod.com/logo.png", Language: "en", Category: []int{1, 2, 3}, Explicit: "clean", RSSURL: "https://syncapod.com/podcast.rss"}
 	err := podStore.InsertPodcast(context.Background(), pod)
 	if err != nil {
@@ -154,7 +154,7 @@ func Test_SearchPodcasts(t *testing.T) {
 }
 
 func Test_FindAllCategories(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	cats, err := podStore.FindAllCategories(context.Background())
 	if err != nil {
 		t.Fatalf("Test_FindEpisodeByURL() error: %v", err)
@@ -163,7 +163,7 @@ func Test_FindAllCategories(t *testing.T) {
 }
 
 func Test_FindUserEpisode(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	userEpi, err := podStore.FindUserEpisode(context.Background(), testUser.ID, testEpi.ID)
 	if err != nil {
 		t.Fatalf("Test_FindUserEpisode() error: %v", err)
@@ -172,7 +172,7 @@ func Test_FindUserEpisode(t *testing.T) {
 }
 
 func Test_FindLastUserEpi(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	userEpi, err := podStore.FindLastUserEpi(context.Background(), testUser.ID)
 	if err != nil {
 		t.Fatalf("Test_FindLastUserEpi() error: %v", err)
@@ -181,7 +181,7 @@ func Test_FindLastUserEpi(t *testing.T) {
 }
 
 func Test_FindLastUserPlayedWithEpisode(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	userEpi, pod, epi, err := podStore.FindLastPlayed(context.Background(), testUser.ID)
 	if err != nil {
 		t.Fatalf("Test_FindLastUserEpiWithEpisode() error: %v", err)
@@ -192,7 +192,7 @@ func Test_FindLastUserPlayedWithEpisode(t *testing.T) {
 }
 
 func Test_UpsertUserEpisode(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	upsertUserEpi := *testUserEpi
 	upsertUserEpi.OffsetMillis = 654321
 	err := podStore.UpsertUserEpisode(context.Background(), &upsertUserEpi)
@@ -207,16 +207,17 @@ func Test_UpsertUserEpisode(t *testing.T) {
 }
 
 func Test_FindEpisodesByRange(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	epis, err := podStore.FindEpisodesByRange(context.Background(), testPod.ID, 0, 2)
 	if err != nil {
 		t.Fatalf("Test_FindEpisodesByRange() error finding episodes: %v", err)
 	}
+	log.Println("pods:", epis)
 	require.Equal(t, []Episode{*testEpi2, *testEpi}, epis)
 }
 
 func Test_InsAndDelSubscription(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	p := &Podcast{ID: uuid.New(), Category: []int{1, 2}}
 	insertPodcastOrFail(podStore, p)
 	s := &Subscription{UserID: testUser.ID, PodcastID: p.ID}
@@ -231,7 +232,7 @@ func Test_InsAndDelSubscription(t *testing.T) {
 }
 
 func Test_FindSubscriptions(t *testing.T) {
-	podStore := NewPodcastStore(testDB)
+	podStore := NewPodcastStore(dbpg)
 	subs, err := podStore.FindSubscriptions(context.Background(), testUser.ID)
 	if err != nil {
 		t.Fatalf("Test_FindSubscriptions() error finding subscriptions: %v", err)

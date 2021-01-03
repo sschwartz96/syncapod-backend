@@ -13,6 +13,7 @@ import (
 	"github.com/sschwartz96/syncapod-backend/internal/protos"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 var (
@@ -30,7 +31,7 @@ var (
 func setupPodDB() error {
 	// for podcast_test
 	var err error
-	podStore := db.NewPodcastStore(testDB)
+	podStore := db.NewPodcastStore(dbpg)
 	if err = podStore.InsertPodcast(context.Background(), testPod); err != nil {
 		return fmt.Errorf("failed to insert podcast: %v", err)
 	}
@@ -49,8 +50,11 @@ func setupPodDB() error {
 	if err = podStore.InsertSubscription(context.Background(), testSub2); err != nil {
 		return fmt.Errorf("failed to insert sub: %v", err)
 	}
+	if err = podStore.UpsertUserEpisode(context.Background(), testUserEpi); err != nil {
+		return fmt.Errorf("failed to insert user episode: %v", err)
+	}
 	// insert user session to mimic user already authenticated
-	authStore := db.NewAuthStorePG(testDB)
+	authStore := db.NewAuthStorePG(dbpg)
 	if err = authStore.InsertSession(context.Background(), testSesh); err != nil {
 		return fmt.Errorf("failed to insert user session: %v", err)
 	}
@@ -58,9 +62,12 @@ func setupPodDB() error {
 }
 
 func Test_PodcastGRPC(t *testing.T) {
+	// add metadata for authorization
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "token", testSesh.ID.String())
+
 	// setup pod client
 	conn, err := grpc.DialContext(
-		context.Background(), "bufnet",
+		ctx, "bufnet",
 		grpc.WithContextDialer(bufDialer),
 		grpc.WithInsecure(),
 	)
@@ -71,13 +78,15 @@ func Test_PodcastGRPC(t *testing.T) {
 	client := protos.NewPodClient(conn)
 
 	// GetPodcast
-	pod, err := client.GetPodcast(context.Background(), &protos.GetPodReq{Id: testPod.ID.String()})
+	pod, err := client.GetPodcast(ctx, &protos.GetPodReq{Id: testPod.ID.String()})
+	if err != nil {
+		log.Panicln("error: ", err)
+	}
 	require.Equal(t, nil, err)
 	require.NotNil(t, pod)
-	log.Println("podcast: ", pod)
 
 	// GetEpisodes
-	epis, err := client.GetEpisodes(context.Background(),
+	epis, err := client.GetEpisodes(ctx,
 		&protos.GetEpiReq{
 			Id:    testPod.ID.String(),
 			Start: 0,
@@ -85,32 +94,35 @@ func Test_PodcastGRPC(t *testing.T) {
 		},
 	)
 	require.Equal(t, nil, err)
-	require.Equal(t,
-		&protos.Episodes{
-			Episodes: convertEpisFromDB([]db.Episode{*testEpi, *testEpi2}),
-		},
-		epis.Episodes,
-	)
+	require.Equal(t, 2, len(epis.Episodes))
+	require.Equal(t, convertEpiFromDB(testEpi2), epis.Episodes[0])
+	require.Equal(t, convertEpiFromDB(testEpi), epis.Episodes[1])
 
 	// GetUserEpisode
-	userEpi, err := client.GetUserEpisode(context.Background(),
+	userEpi, err := client.GetUserEpisode(ctx,
 		&protos.GetUserEpiReq{EpiID: testEpi.ID.String()})
+	if err != nil {
+		log.Println(err)
+	}
 	require.Equal(t, nil, err)
 	require.NotEqual(t, nil, userEpi)
 
-	// UpdateUserEpisode
+	// UpsertUserEpisode
 	userEpi.Offset = 9999
-	res, err := client.UpsertUserEpisode(context.Background(), userEpi)
+	res, err := client.UpsertUserEpisode(ctx, userEpi)
+	if err != nil {
+		log.Println("userepisode:", err)
+	}
 	require.Equal(t, nil, err)
 	require.NotEqual(t, nil, res)
 
 	// GetSubscriptions
-	subs, err := client.GetSubscriptions(context.Background(), &protos.GetSubReq{})
+	subs, err := client.GetSubscriptions(ctx, &protos.GetSubReq{})
 	require.Equal(t, nil, err)
 	require.NotEmpty(t, subs.Subscriptions)
 
 	// GetUserLastPlayed
-	lastPlayRes, err := client.GetUserLastPlayed(context.Background(), &protos.GetUserLastPlayedReq{})
+	lastPlayRes, err := client.GetUserLastPlayed(ctx, &protos.GetUserLastPlayedReq{})
 	require.Equal(t, nil, err)
 	require.NotEmpty(t, lastPlayRes.Episode)
 	require.NotEmpty(t, lastPlayRes.Podcast)
