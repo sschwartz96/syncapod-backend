@@ -100,14 +100,6 @@ func setupAuthDB() error {
 	return nil
 }
 
-func dbDeleteOrFail(table string) {
-	_, err := dbpg.Exec(context.Background(),
-		fmt.Sprintf("DELETE FROM %v", table))
-	if err != nil {
-		log.Fatalf("dbDeleteOrFail() could not delete rows of table: %v", err)
-	}
-}
-
 func TestAuthGRPC(t *testing.T) {
 	// setup auth client
 	conn, err := grpc.DialContext(

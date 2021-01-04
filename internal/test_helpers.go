@@ -27,6 +27,10 @@ func StartDockerDB(name string) (*pgxpool.Pool, func() error, error) {
 
 	// start the postgres instance
 	resource, err := dockerPool.Run("postgres", "latest", []string{"POSTGRES_PASSWORD=secret"})
+	if err != nil {
+		return nil, nil, fmt.Errorf("StartDockerDB() error creating resource: %v", err)
+	}
+
 	// 10 second wait time to connect to the db
 	dockerPool.MaxWait = time.Second * 10
 	err = dockerPool.Retry(func() error {
