@@ -59,13 +59,17 @@ func (h *OauthHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 // Login handles the post and get request of a login page
 func (h *OauthHandler) Login(res http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
-		h.loginTemplate.Execute(res, false)
+		if err := h.loginTemplate.Execute(res, false); err != nil {
+			log.Printf("OauthHandler.Login() error executing loginTemplate: %v\n", err)
+		}
 		return
 	}
 	err := req.ParseForm()
 	if err != nil {
 		fmt.Println("couldn't parse post values: ", err)
-		h.loginTemplate.Execute(res, true)
+		if err := h.loginTemplate.Execute(res, true); err != nil {
+			log.Printf("OauthHandler.Login() error executing loginTemplate: %v\n", err)
+		}
 		return
 	}
 
@@ -73,8 +77,9 @@ func (h *OauthHandler) Login(res http.ResponseWriter, req *http.Request) {
 	password := req.FormValue("pass")
 	_, sesh, err := h.authController.Login(req.Context(), username, password, req.UserAgent())
 	if err != nil {
-		log.Println("user: %s\tpassword:%s")
-		h.loginTemplate.Execute(res, true)
+		if err := h.loginTemplate.Execute(res, true); err != nil {
+			log.Printf("OauthHandler.Login() error executing loginTemplate: %v\n", err)
+		}
 		return
 	}
 
@@ -215,7 +220,9 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "application/json")
 	res.Header().Set("Cache-Control", "no-store")
 	res.Header().Set("Pragma", "no-cache")
-	res.Write(json)
+	if _, err = res.Write(json); err != nil {
+		log.Printf("OauthHandler.Token() error writing response: %v", err)
+	}
 }
 
 func sendTokenError(res http.ResponseWriter, err string) {
@@ -225,5 +232,7 @@ func sendTokenError(res http.ResponseWriter, err string) {
 	errRes := &tokenErrorResponse{err}
 	errResJson, _ := json.Marshal(errRes)
 	res.WriteHeader(http.StatusBadRequest)
-	res.Write(errResJson)
+	if _, err := res.Write(errResJson); err != nil {
+		log.Printf("OauthHandler.Token() error writing response: %v", err)
+	}
 }

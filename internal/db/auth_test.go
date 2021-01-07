@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"reflect"
@@ -45,14 +44,6 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(runCode)
-}
-
-func dbDeleteOrFail(table string) {
-	_, err := dbpg.Exec(context.Background(),
-		fmt.Sprintf("DELETE FROM %v", table))
-	if err != nil {
-		log.Fatalf("dbDeleteOrFail() could not delete rows of table: %v", err)
-	}
 }
 
 func TestAuthStorePG_InsertUser(t *testing.T) {

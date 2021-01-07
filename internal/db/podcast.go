@@ -27,7 +27,9 @@ type scanner interface {
 func scanPodcastRows(rows pgx.Rows, p []Podcast) ([]Podcast, error) {
 	for rows.Next() {
 		temp := &Podcast{}
-		scanPodcastRow(rows, temp)
+		if err := scanPodcastRow(rows, temp); err != nil {
+			return p, fmt.Errorf("scanPodcastRows() error scanning row: %v", err)
+		}
 		p = append(p, *temp)
 	}
 	if err := rows.Err(); err != nil {
@@ -45,7 +47,9 @@ func scanPodcastRow(row scanner, p *Podcast) error {
 func scanEpisodeRows(rows pgx.Rows, e []Episode) ([]Episode, error) {
 	for rows.Next() {
 		temp := &Episode{}
-		scanEpisodeRow(rows, temp)
+		if err := scanEpisodeRow(rows, temp); err != nil {
+			return e, fmt.Errorf("scanEpisodeRows() error scanning episode row: %v", err)
+		}
 		e = append(e, *temp)
 	}
 	if err := rows.Err(); err != nil {
@@ -260,7 +264,9 @@ func (ps *PodcastStore) FindLastPlayed(ctx context.Context, userID uuid.UUID) (*
 func scanSubRows(rows pgx.Rows, s []Subscription) ([]Subscription, error) {
 	for rows.Next() {
 		temp := &Subscription{}
-		scanSubRow(rows, temp)
+		if err := scanSubRow(rows, temp); err != nil {
+			return s, fmt.Errorf("scanSubRows() error scanning subscription row: %v", err)
+		}
 		s = append(s, *temp)
 	}
 	if err := rows.Err(); err != nil {

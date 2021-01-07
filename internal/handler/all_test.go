@@ -98,7 +98,7 @@ func Test_Oauth(t *testing.T) {
 	req = httptest.NewRequest("POST", uri, nil)
 	testHandler.oauthHandler.Authorize(rec, req)
 	res := rec.Result()
-	body, err = ioutil.ReadAll(res.Body)
+	_, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		t.Fatalf("Test_Oauth() POST authorize error: %v", err)
 	}
