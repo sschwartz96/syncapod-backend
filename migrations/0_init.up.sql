@@ -27,7 +27,7 @@ CREATE TABLE AuthCodes (
 
 CREATE TABLE AccessTokens (
 	token BYTEA PRIMARY KEY,
-	auth_code BYTEA NOT NULL REFERENCES AuthCodes(code) ON DELETE CASCADE,
+	auth_code BYTEA NOT NULL,
 	refresh_token BYTEA NOT NULL,
 	user_id UUID NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
 	created TIMESTAMPTZ NOT NULL,

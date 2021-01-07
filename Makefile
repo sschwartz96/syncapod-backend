@@ -11,10 +11,10 @@ run:
 	go run ./cmd/main.go
 
 build:
-	go build ./cmd/main.go
+	go build -o syncapod ./cmd/main.go
 
 clean:
-	rm main -f
+	rm ./syncapod -f
 	go clean -testcache
 
 test:
@@ -25,6 +25,11 @@ testv:
 
 coverage:
 	go test ./... -cover
+
+deploy:
+	CGO_ENABLED=0 go build -o syncapod ./cmd/main.go 
+	rsync -a ./templates ./migrations ./docker-compose.yml ./LICENSE ./syncapod \
+		root@syncapod.com:/root/syncapod
 
 protos:
 	protoc -I ~/projects/syncapod/syncapod-protos/ \

@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -72,6 +73,7 @@ func (h *OauthHandler) Login(res http.ResponseWriter, req *http.Request) {
 	password := req.FormValue("pass")
 	_, sesh, err := h.authController.Login(req.Context(), username, password, req.UserAgent())
 	if err != nil {
+		log.Println("user: %s\tpassword:%s")
 		h.loginTemplate.Execute(res, true)
 		return
 	}
@@ -165,7 +167,7 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 		refreshToken := req.FormValue("refresh_token")
 		accessToken, err := h.authController.ValidateRefreshToken(req.Context(), refreshToken)
 		if err != nil {
-			fmt.Println("couldn't find token based on refresh token: ", err)
+			fmt.Println("OauthHandler.Token() couldn't find token based on refresh token: ", err)
 			sendTokenError(res, "invalid_grant")
 			return
 		}
@@ -198,7 +200,7 @@ func (h *OauthHandler) Token(res http.ResponseWriter, req *http.Request) {
 		ExpiresIn    int    `json:"expires_in"`
 	}
 	tRes := &tokenResponse{
-		AccessToken:  auth.EncodeKey(token.AuthCode),
+		AccessToken:  auth.EncodeKey(token.Token),
 		RefreshToken: auth.EncodeKey(token.RefreshToken),
 		ExpiresIn:    3600,
 	}

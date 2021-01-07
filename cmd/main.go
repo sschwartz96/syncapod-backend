@@ -84,12 +84,12 @@ func main() {
 		// setup listener
 		grpcListener, err := net.Listen("tcp", ":"+strconv.Itoa(cfg.GRPCPort))
 		if err != nil {
-			log.Fatalf("could not listen on port %d, err: %v", cfg.GRPCPort, err)
+			log.Fatalf("main.grpc could not listen on port %d, err: %v", cfg.GRPCPort, err)
 		}
 		// start server
 		err = grpcServer.Start(grpcListener)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("main.grpc error starting server: %v", err)
 		}
 	}()
 
@@ -99,7 +99,7 @@ func main() {
 	log.Println("setting up handlers")
 
 	// setup handler
-	handler, err := handler.CreateHandler(cfg, authController)
+	handler, err := handler.CreateHandler(cfg, authController, podController)
 	if err != nil {
 		log.Fatal("could not setup handlers: ", err)
 	}
@@ -110,6 +110,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+
 }
 
 func createCertManager(cfg *config.Config) *autocert.Manager {
