@@ -169,7 +169,7 @@ func createTestOAuthHandler(authC auth.Auth) (*OauthHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &OauthHandler{authC, loginT, authT, "testClientID", "testClientSecret"}, nil
+	return &OauthHandler{authC, loginT, authT, map[string]string{"testClientID": "testClientSecret"}}, nil
 }
 
 func setup(pg *pgxpool.Pool) {

@@ -36,6 +36,7 @@ type Config struct {
 	GRPCPort        int    `json:"grpc_port"`
 	Production      bool   `json:"production"`
 	CertDir         string `json:"cert_dir"` // only used if production=true
+	Debug           bool   `json:"debug"`
 }
 
 // ReadConfig reads the config file encoded in JSON

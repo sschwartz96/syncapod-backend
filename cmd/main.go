@@ -104,6 +104,23 @@ func main() {
 		log.Fatal("could not setup handlers: ", err)
 	}
 
+	// debug
+	if cfg.Debug {
+		_, err := authController.CreateUser(context.Background(), "testUser@syncapod.com", "testUser", "testUser123!@#", time.Now())
+		if err != nil {
+			log.Printf("failed to create test user: %v\n", err)
+		}
+		r, err := podcast.DownloadRSS("https://feeds.twit.tv/twit.xml")
+		if err != nil {
+			log.Printf("failed to download debug podcast: %v\n", err)
+		}
+		podID, err := rssController.AddNewPodcast("https://feeds.twit.tv/twit.xml", r)
+		if err != nil {
+			log.Printf("failed to add debug podcast: %v\n", err)
+		}
+		log.Println("podID:", podID)
+	}
+
 	// start server
 	log.Println("starting server")
 	err = startServer(cfg, certMan, handler)

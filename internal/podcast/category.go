@@ -2,6 +2,8 @@ package podcast
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"sort"
 	"sync"
 
@@ -31,14 +33,17 @@ func newCategoryCache(dbCats []db.Category) *CategoryCache {
 func (c *CategoryCache) LookupIDs(ids []int) ([]Category, error) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
+	log.Println("LookupIDs:", ids)
 	parentMap := map[int]*Category{}
 	// range all ids
 	for i := range ids {
 		if i > len(c.dbCats) {
-			return nil, errors.New("CategoryController.LookupIDs() error: category index out of range")
+			return nil, errors.New("CategoryCache.LookupIDs() error: category index out of range")
 		}
+		log.Println("looking up cat with id:", ids[i])
 		dbCat := c.dbCats[ids[i]]
-		// no parent so create a new parent category
+		log.Printf("found cat: %s, with id: %d", dbCat.Name, dbCat.ID)
+		// no parent means it is a parent, create new parent cat
 		if dbCat.ParentID == 0 {
 			parentMap[dbCat.ID] = &Category{ID: dbCat.ID, Name: dbCat.Name, Subcategories: []Category{}}
 			continue
@@ -46,7 +51,7 @@ func (c *CategoryCache) LookupIDs(ids []int) ([]Category, error) {
 		// check to make sure we have a valid sub category
 		parent, ok := parentMap[dbCat.ParentID]
 		if !ok {
-			return nil, errors.New("CategoryController.LookupIDs() error: parent map does not exist")
+			return nil, fmt.Errorf("CategoryCache.LookupIDs() error: parent map does not exist,catID: %d, parentID: %d", dbCat.ID, dbCat.ParentID)
 		}
 		// append to existing parent
 		parent.Subcategories = append(parent.Subcategories, Category{dbCat.ID, dbCat.Name, nil})
@@ -60,7 +65,7 @@ func (c *CategoryCache) LookupIDs(ids []int) ([]Category, error) {
 }
 
 // TranslateCategories recursively appends category ids into the ids slice.
-// Uses the codes maps held within the CategoryController
+// Uses the codes maps held within the CategoryCache
 func (c *CategoryCache) TranslateCategories(cats []Category, ids []int) []int {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
@@ -70,9 +75,7 @@ func (c *CategoryCache) TranslateCategories(cats []Category, ids []int) []int {
 	for i := range cats {
 		// append parent id
 		ids = append(ids, c.codes[cats[i].Name])
-		if cats[i].ID == 0 {
-			return ids
-		}
+
 		// recursively append children
 		ids = c.TranslateCategories(cats[i].Subcategories, ids)
 	}

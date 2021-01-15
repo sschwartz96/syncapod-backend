@@ -290,6 +290,7 @@ func (c *RSSController) rssChannelToPodcast(r *rssChannel, id uuid.UUID, rssURL 
 	if err != nil {
 		log.Println("rssChannelToPodcast() error converting pubdate:", err)
 	}
+	log.Println("pod cats:", r.Categories)
 	return &db.Podcast{
 		ID:          id,
 		Title:       r.Title,
