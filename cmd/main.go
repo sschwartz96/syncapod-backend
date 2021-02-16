@@ -14,6 +14,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/sschwartz96/syncapod-backend/internal/auth"
 	"github.com/sschwartz96/syncapod-backend/internal/config"
@@ -21,7 +22,9 @@ import (
 	sGRPC "github.com/sschwartz96/syncapod-backend/internal/grpc"
 	"github.com/sschwartz96/syncapod-backend/internal/handler"
 	"github.com/sschwartz96/syncapod-backend/internal/podcast"
+	"github.com/sschwartz96/syncapod-backend/internal/protos"
 	"golang.org/x/crypto/acme/autocert"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -74,12 +77,21 @@ func main() {
 	}
 	rssController := podcast.NewRSSController(podController)
 
+	// setup grpc services
+	gAuthService := sGRPC.NewAuthService(authController)
+	gPodService := sGRPC.NewPodcastService(podController)
+
 	// setup & start gRPC server
 	grpcServer := sGRPC.NewServer(certMan,
 		authController,
-		sGRPC.NewAuthService(authController),
-		sGRPC.NewPodcastService(podController),
+		gAuthService,
+		gPodService,
 	)
+
+	if err != nil {
+		log.Fatalf("failed to create grpc auth handler endpoint\n%v\n", err)
+	}
+
 	go func() {
 		// setup listener
 		grpcListener, err := net.Listen("tcp", ":"+strconv.Itoa(cfg.GRPCPort))
@@ -95,6 +107,8 @@ func main() {
 
 	// start updating podcasts
 	go updatePodcasts(rssController)
+
+	startGRPCGateway(ctx, cfg, certMan)
 
 	log.Println("setting up handlers")
 
@@ -175,5 +189,36 @@ func startServer(cfg *config.Config, a *autocert.Manager, h *handler.Handler) er
 		return s.ListenAndServeTLS("", "")
 	} else {
 		return http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), h)
+	}
+}
+
+func startGRPCGateway(ctx context.Context, cfg *config.Config, a *autocert.Manager) {
+	// setup grpc-gateway
+	grpcEndpoint := "localhost:" + strconv.Itoa(cfg.GRPCPort)
+	grpcMux := runtime.NewServeMux()
+	grpcGatewayOpts := []grpc.DialOption{grpc.WithInsecure()}
+	err := protos.RegisterAuthHandlerFromEndpoint(context.Background(), grpcMux, grpcEndpoint, grpcGatewayOpts)
+	if err != nil {
+		log.Fatalf("failed to register auth handler from endpoint %v", err)
+	}
+	err = protos.RegisterPodHandlerFromEndpoint(ctx, grpcMux, grpcEndpoint, grpcGatewayOpts)
+	if err != nil {
+		log.Fatalf("failed to register auth handler from endpoint %v", err)
+	}
+	if cfg.Production {
+		s := &http.Server{
+			Addr:      ":50052",
+			TLSConfig: a.TLSConfig(),
+			Handler:   grpcMux,
+		}
+		go log.Fatalf(
+			"error listen and serve grpc mux: %v",
+			s.ListenAndServeTLS("", ""),
+		)
+	} else {
+		go log.Fatalf(
+			"error listen and serve grpc mux: %v",
+			http.ListenAndServe(":50052", grpcMux),
+		)
 	}
 }

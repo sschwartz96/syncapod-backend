@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"strings"
 
@@ -66,6 +67,7 @@ func (s *Server) Intercept() grpc.UnaryServerInterceptor {
 		if !ok {
 			return nil, errors.New("invalid metadata")
 		}
+		log.Println(md.Copy())
 		token := md.Get("token")
 		if len(token) == 0 {
 			return nil, errors.New("no access token sent")
