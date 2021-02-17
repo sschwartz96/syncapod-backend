@@ -34,6 +34,7 @@ deploy:
 	CGO_ENABLED=0 go build -o syncapod ./cmd/main.go 
 	rsync -a ./templates ./migrations ./docker-compose.yml ./LICENSE ./syncapod \
 		root@syncapod.com:/root/syncapod
+	rm ./syncapod
 
 protos:
 	protoc -I $(PROTO_DIR) \

@@ -25,6 +25,7 @@ import (
 	"github.com/sschwartz96/syncapod-backend/internal/protos"
 	"golang.org/x/crypto/acme/autocert"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 func main() {
@@ -108,7 +109,8 @@ func main() {
 	// start updating podcasts
 	go updatePodcasts(rssController)
 
-	startGRPCGateway(ctx, cfg, certMan)
+	log.Println("starting grpc gateway")
+	startGRPCGateway(cfg, certMan)
 
 	log.Println("setting up handlers")
 
@@ -118,8 +120,8 @@ func main() {
 		log.Fatal("could not setup handlers: ", err)
 	}
 
-	// debug
-	if cfg.Debug {
+	// debug TODO: remove
+	if cfg.Debug || true {
 		_, err := authController.CreateUser(context.Background(), "testUser@syncapod.com", "testUser", "testUser123!@#", time.Now())
 		if err != nil {
 			log.Printf("failed to create test user: %v\n", err)
@@ -192,33 +194,44 @@ func startServer(cfg *config.Config, a *autocert.Manager, h *handler.Handler) er
 	}
 }
 
-func startGRPCGateway(ctx context.Context, cfg *config.Config, a *autocert.Manager) {
+func startGRPCGateway(cfg *config.Config, a *autocert.Manager) {
 	// setup grpc-gateway
-	grpcEndpoint := "localhost:" + strconv.Itoa(cfg.GRPCPort)
+	grpcEndpoint := ":" + strconv.Itoa(cfg.GRPCPort)
 	grpcMux := runtime.NewServeMux()
 	grpcGatewayOpts := []grpc.DialOption{grpc.WithInsecure()}
-	err := protos.RegisterAuthHandlerFromEndpoint(context.Background(), grpcMux, grpcEndpoint, grpcGatewayOpts)
+	if cfg.Production {
+		grpcGatewayOpts = []grpc.DialOption{
+			grpc.WithBlock(),
+			grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, "")),
+		}
+	}
+	ctx := context.Background()
+	err := protos.RegisterAuthHandlerFromEndpoint(ctx, grpcMux, grpcEndpoint, grpcGatewayOpts)
 	if err != nil {
 		log.Fatalf("failed to register auth handler from endpoint %v", err)
 	}
 	err = protos.RegisterPodHandlerFromEndpoint(ctx, grpcMux, grpcEndpoint, grpcGatewayOpts)
 	if err != nil {
-		log.Fatalf("failed to register auth handler from endpoint %v", err)
+		log.Fatalf("failed to register podcast handler from endpoint %v", err)
 	}
 	if cfg.Production {
 		s := &http.Server{
-			Addr:      ":50052",
+			Addr:      ":" + strconv.Itoa(cfg.GRPCGatewayPort),
 			TLSConfig: a.TLSConfig(),
 			Handler:   grpcMux,
 		}
-		go log.Fatalf(
-			"error listen and serve grpc mux: %v",
-			s.ListenAndServeTLS("", ""),
-		)
+		go func() {
+			log.Fatalf(
+				"error listen and serve grpc mux: %v",
+				s.ListenAndServeTLS("", ""),
+			)
+		}()
 	} else {
-		go log.Fatalf(
-			"error listen and serve grpc mux: %v",
-			http.ListenAndServe(":50052", grpcMux),
-		)
+		go func() {
+			log.Fatalf(
+				"error listen and serve grpc mux: %v",
+				http.ListenAndServe(":"+strconv.Itoa(cfg.GRPCGatewayPort), grpcMux),
+			)
+		}()
 	}
 }
