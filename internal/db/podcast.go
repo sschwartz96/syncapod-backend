@@ -172,7 +172,10 @@ func (p *PodcastStore) FindEpisodeByURL(ctx context.Context, podID uuid.UUID, mp
 func (ps *PodcastStore) FindEpisodesByRange(ctx context.Context, podID uuid.UUID, start, end int64) ([]Episode, error) {
 	limit := end - start
 	offset := start
-	rows, err := ps.db.Query(ctx, "SELECT * FROM Episodes ORDER BY pub_date DESC LIMIT $1 OFFSET $2 ", limit, offset)
+	rows, err := ps.db.Query(ctx,
+		"SELECT * FROM Episodes WHERE podcast_id=$1 ORDER BY pub_date DESC LIMIT $2 OFFSET $3 ",
+		podID, limit, offset,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("FindPodcastsByRange() error: %v", err)
 	}

@@ -101,7 +101,7 @@ func (c *RSSController) updatePodcast(pod *db.Podcast) error {
 // AddNewPodcast takes RSS url and a reader to the RSS feed and
 // inserts the podcast and its episodes into the db
 // returns error if podcast already exists
-func (c *RSSController) AddNewPodcast(url string, r io.Reader) (*uuid.UUID, error) {
+func (c *RSSController) AddNewPodcast(url string, r io.Reader) (*db.Podcast, error) {
 	// check if podcast already contains that rss url
 	exists := c.podController.DoesPodcastExist(context.Background(), url)
 	if exists {
@@ -129,7 +129,7 @@ func (c *RSSController) AddNewPodcast(url string, r io.Reader) (*uuid.UUID, erro
 			log.Println("AddNewPodcast() couldn't insert episode: ", err)
 		}
 	}
-	return &pod.ID, nil
+	return pod, nil
 }
 
 func DownloadRSS(url string) (io.ReadCloser, error) {

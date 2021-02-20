@@ -11,7 +11,6 @@ package protos
 import (
 	"context"
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -499,7 +498,6 @@ func RegisterPodHandlerClient(ctx context.Context, mux *runtime.ServeMux, client
 	})
 
 	mux.Handle("POST", pattern_Pod_GetEpisodes_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		log.Println("pattern_Pod_GetPodcast_0:", req.Header.Clone())
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)

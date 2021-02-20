@@ -81,12 +81,14 @@ func main() {
 	// setup grpc services
 	gAuthService := sGRPC.NewAuthService(authController)
 	gPodService := sGRPC.NewPodcastService(podController)
+	gAdminService := sGRPC.NewAdminService(podController, rssController)
 
 	// setup & start gRPC server
 	grpcServer := sGRPC.NewServer(certMan,
 		authController,
 		gAuthService,
 		gPodService,
+		gAdminService,
 	)
 
 	if err != nil {
@@ -213,6 +215,10 @@ func startGRPCGateway(cfg *config.Config, a *autocert.Manager) {
 	err = protos.RegisterPodHandlerFromEndpoint(ctx, grpcMux, grpcEndpoint, grpcGatewayOpts)
 	if err != nil {
 		log.Fatalf("failed to register podcast handler from endpoint %v", err)
+	}
+	err = protos.RegisterAdminHandlerFromEndpoint(ctx, grpcMux, grpcEndpoint, grpcGatewayOpts)
+	if err != nil {
+		log.Fatalf("failed to register admi: handler from endpoint %v", err)
 	}
 	if cfg.Production {
 		s := &http.Server{

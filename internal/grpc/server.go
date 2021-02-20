@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 
@@ -25,7 +24,7 @@ type Server struct {
 	authC  *auth.AuthController
 }
 
-func NewServer(a *autocert.Manager, aC *auth.AuthController, aS protos.AuthServer, pS protos.PodServer) *Server {
+func NewServer(a *autocert.Manager, aC *auth.AuthController, aS protos.AuthServer, pS protos.PodServer, adminS protos.AdminServer) *Server {
 	var grpcServer *grpc.Server
 	s := &Server{authC: aC}
 	// setup server
@@ -37,6 +36,7 @@ func NewServer(a *autocert.Manager, aC *auth.AuthController, aS protos.AuthServe
 	reflection.Register(grpcServer)
 	protos.RegisterAuthServer(s.server, aS)
 	protos.RegisterPodServer(s.server, pS)
+	protos.RegisterAdminServer(s.server, adminS)
 	return s
 }
 
@@ -67,7 +67,6 @@ func (s *Server) Intercept() grpc.UnaryServerInterceptor {
 		if !ok {
 			return nil, errors.New("invalid metadata")
 		}
-		log.Println(md.Copy())
 		token := md.Get("token")
 		if len(token) == 0 {
 			return nil, errors.New("no access token sent")
