@@ -51,7 +51,7 @@ func Test_AdminGRPC(t *testing.T) {
 
 	// AddPodcast
 	addPodRes, err := client.AddPodcast(ctx, &protos.AddPodReq{Url: goTimeRSSURL})
-	require.Nil(t, err, "error AddPodcast()", err.Error())
+	require.Nil(t, err, "error AddPodcast()")
 	require.Equal(t, "Go Time", addPodRes.Podcast.Title)
 
 	// RefreshPodcast

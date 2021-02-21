@@ -182,6 +182,15 @@ func (ps *PodcastStore) FindEpisodesByRange(ctx context.Context, podID uuid.UUID
 	return scanEpisodeRows(rows, []Episode{})
 }
 
+func (p *PodcastStore) InsertCategory(ctx context.Context, cat *Category) error {
+	_, err := p.db.Exec(ctx, "INSERT INTO Categories(id,name,parent_id) VALUES($1,$2,$3)",
+		cat.ID, cat.Name, cat.ParentID)
+	if err != nil {
+		return fmt.Errorf("InsertCategory() error inserting cateogry: %v", err)
+	}
+	return nil
+}
+
 func (p *PodcastStore) FindAllCategories(ctx context.Context) ([]Category, error) {
 	cats := []Category{}
 	rows, err := p.db.Query(ctx, "SELECT * FROM Categories")
