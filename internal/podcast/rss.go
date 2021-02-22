@@ -293,7 +293,7 @@ func (c *RSSController) rssChannelToPodcast(r *rssChannel, id uuid.UUID, rssURL 
 	if err != nil {
 		log.Println("rssChannelToPodcast() error converting pubdate:", err)
 	}
-	cats, err := c.podController.catCache.TranslateCategories(r.Categories, 0, []int{})
+	cats, err := c.podController.catCache.TranslateCategories(r.Categories)
 	if err != nil {
 		return nil, fmt.Errorf("rssChannelToPodcast() error translating categories: %v", err)
 	}

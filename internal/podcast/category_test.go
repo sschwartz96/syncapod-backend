@@ -139,7 +139,7 @@ func TestCategoryController_TranslateCategories(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := catCache.TranslateCategories(tt.cats, 0, []int{})
+			got, err := catCache.TranslateCategories(tt.cats)
 			require.Nil(t, err)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("CategoryController.TranslateCategories() = %v, want %v", got, tt.want)

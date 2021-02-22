@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"sort"
 	"sync"
 	"time"
@@ -15,7 +14,7 @@ import (
 type CategoryCache struct {
 	// index represents id
 	dbCats []db.Category
-	// string represents: parent+category name
+	// codes[key] = parentID; where key is generate by buildAncesterTree()
 	codes map[string]int
 	mutex sync.RWMutex
 	// necessary to add new unknown categories
@@ -31,9 +30,8 @@ func newCategoryCache(dbCats []db.Category, podStore *db.PodcastStore) *Category
 	}
 	catCache.dbCats = append(catCache.dbCats, dbCats...)
 	for i := range dbCats {
-		catCache.codes[catCache.buildAncesterTree(i, "")] = dbCats[i].ID
+		catCache.codes[catCache.buildAncesterTree(dbCats[i].ParentID, dbCats[i].Name)] = dbCats[i].ID
 	}
-	log.Println("codes:", catCache.codes)
 	return &catCache
 }
 
@@ -43,16 +41,13 @@ func newCategoryCache(dbCats []db.Category, podStore *db.PodcastStore) *Category
 func (c *CategoryCache) LookupIDs(ids []int) ([]Category, error) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	log.Println("LookupIDs:", ids)
 	parentMap := map[int]*Category{}
 	// range through all ids
 	for i := range ids {
 		if i > len(c.dbCats) {
 			return nil, errors.New("CategoryCache.LookupIDs() error: category index out of range")
 		}
-		log.Println("looking up cat with id:", ids[i])
 		dbCat := c.dbCats[ids[i]]
-		log.Printf("found cat: %s, with id: %d", dbCat.Name, dbCat.ID)
 		// no parent means it is a parent, create new parent cat
 		if dbCat.ParentID == 0 {
 			parentMap[dbCat.ID] = &Category{ID: dbCat.ID, Name: dbCat.Name, Subcategories: []Category{}}
@@ -76,20 +71,36 @@ func (c *CategoryCache) LookupIDs(ids []int) ([]Category, error) {
 
 // TranslateCategories recursively appends category ids into a slice of ids
 // Uses the codes maps held within the CategoryCache
-func (c *CategoryCache) TranslateCategories(cats []Category, parentID int, ids []int) ([]int, error) {
-	var err error
+func (c *CategoryCache) TranslateCategories(cats []Category) ([]int, error) {
+	var catIDs []int
+	var unknown string
+	// translateCategories but on category does not exist restart
+	for catIDs, unknown = c.translateCategories(cats, 0, []int{}); unknown != ""; catIDs, unknown = c.translateCategories(cats, 0, []int{}) {
+		if err := c.addNewCategory(unknown, catIDs[0]); err != nil {
+			return nil, err
+		}
+	}
+	return catIDs, nil
+}
+
+// translateCategories return succesful translated categories or name of unknown category
+func (c *CategoryCache) translateCategories(cats []Category, parentID int, ids []int) ([]int, string) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	if cats == nil {
-		return ids, nil
+		return ids, ""
 	}
 	for i := range cats {
+		var tree string
 		cat := cats[i]
-		tree := c.buildAncesterTree(cat.ID, "")
-		if tree == "" {
-			err = c.addNewCategory(cat, parentID)
-			if err != nil {
-				return nil, fmt.Errorf("TranslateCategories() error: %v", err)
+		// if current category is top of hierarchy
+		if parentID == 0 {
+			tree = cat.Name
+		} else {
+			tree = c.buildAncesterTree(parentID, cat.Name)
+			// the current category does not exist in database
+			if c.codes[tree] == 0 {
+				return []int{parentID}, cat.Name
 			}
 		}
 
@@ -97,27 +108,37 @@ func (c *CategoryCache) TranslateCategories(cats []Category, parentID int, ids [
 		ids = append(ids, c.codes[tree])
 
 		// recursively append children
-		ids, err = c.TranslateCategories(cat.Subcategories, cat.ID, ids)
-		if err != nil {
-			return nil, err
+		unk := ""
+		ids, unk = c.translateCategories(cat.Subcategories, c.codes[tree], ids)
+		if unk != "" {
+			return ids, unk
 		}
 	}
-	return ids, nil
+	return ids, ""
 }
 
-func (c *CategoryCache) addNewCategory(cat Category, parentID int) error {
+// addNewCategory takes a category name and parent id to construct new category
+// saves new category into database and return current id
+// returns error if database connection fails
+func (c *CategoryCache) addNewCategory(name string, parentID int) error {
+	// construct new category
+	cat := db.Category{ID: len(c.dbCats), Name: name, ParentID: parentID}
+	tree := c.buildAncesterTree(parentID, cat.Name)
+
+	// lock cache and update
 	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	// add id
-	cat.ID = len(c.dbCats)
-	dbCat := db.Category{ID: cat.ID, Name: cat.Name, ParentID: parentID}
-	c.dbCats = append(c.dbCats, dbCat)
-	c.codes[c.buildAncesterTree(cat.ID, cat.Name)] = cat.ID
+	c.dbCats = append(c.dbCats, cat)
+	c.codes[tree] = cat.ID
+	c.mutex.Unlock()
 
 	// insert into db
 	ctx, cncFn := context.WithTimeout(context.Background(), time.Second*5)
 	defer cncFn()
-	return c.podStore.InsertCategory(ctx, &dbCat)
+	err := c.podStore.InsertCategory(ctx, &cat)
+	if err != nil {
+		return fmt.Errorf("addNewCategory() error: %v", err)
+	}
+	return nil
 }
 
 func catSort(c []Category) []Category {
@@ -127,11 +148,15 @@ func catSort(c []Category) []Category {
 	return c
 }
 
-func (c *CategoryCache) buildAncesterTree(i int, s string) string {
+// buildAncesterTree takes:
+//  pid: parent id
+//  s: cat name
+// returns string in form of: etc->grandparent->parent->child(current)
+func (c *CategoryCache) buildAncesterTree(pid int, s string) string {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	if c.dbCats[i].ParentID == 0 {
-		return c.dbCats[i].Name
+	if pid == 0 {
+		return s
 	}
-	return c.buildAncesterTree(c.dbCats[i].ParentID, s) + c.dbCats[i].Name + s
+	return c.buildAncesterTree(c.dbCats[pid].ParentID, c.dbCats[pid].Name) + s
 }
