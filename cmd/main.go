@@ -16,6 +16,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/rs/cors"
 	"github.com/sschwartz96/syncapod-backend/internal/auth"
 	"github.com/sschwartz96/syncapod-backend/internal/config"
 	"github.com/sschwartz96/syncapod-backend/internal/db"
@@ -233,10 +234,12 @@ func startGRPCGateway(cfg *config.Config, a *autocert.Manager) {
 			)
 		}()
 	} else {
+		// allow cors for localhost testing
+		h := cors.Default().Handler(grpcMux)
 		go func() {
 			log.Fatalf(
 				"error listen and serve grpc mux: %v",
-				http.ListenAndServe(":"+strconv.Itoa(cfg.GRPCGatewayPort), grpcMux),
+				http.ListenAndServe(":"+strconv.Itoa(cfg.GRPCGatewayPort), h),
 			)
 		}()
 	}
