@@ -1,6 +1,8 @@
-GOOGLE_API_PROTO_DIR := /home/sam/github.com/googleapis
-INTERNAL_DIR := /home/sam/projects/syncapod/syncapod-backend/internal
-PROTO_DIR := /home/sam/projects/syncapod/syncapod-protos/
+# support for .env file
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif 
 
 .PHONY: db migrate run test testv test-db coverage protos
 
@@ -38,15 +40,15 @@ deploy:
 
 protos:
 	protoc -I $(PROTO_DIR) \
-		-I $(GOOGLE_API_PROTO_DIR) \
-		--go_out=internal/protos/ \
-		--go-grpc_out=internal/protos/ \
+		-I ${GOOGLE_API_PROTO_DIR} \
+		--go_out=internal/gen/ \
+		--twirp_out=internal/gen/ \
 		$(PROTO_DIR)*
 
 grpc-gateway:
 	protoc -I $(PROTO_DIR) \
-		-I $(GOOGLE_API_PROTO_DIR) \
-		--grpc-gateway_out=$(INTERNAL_DIR)/protos \
+		-I ${GOOGLE_API_PROTO_DIR} \
+		--grpc-gateway_out=internal/protos \
 		--grpc-gateway_opt logtostderr=true \
 		--grpc-gateway_opt generate_unbound_methods=true \
 		$(PROTO_DIR)*
