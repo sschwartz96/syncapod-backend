@@ -8,10 +8,9 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/google/uuid"
 	"github.com/sschwartz96/syncapod-backend/internal/db"
+	protos "github.com/sschwartz96/syncapod-backend/internal/gen"
 	"github.com/sschwartz96/syncapod-backend/internal/podcast"
-	protos "github.com/sschwartz96/syncapod-backend/internal/protos_delete"
 	"github.com/twitchtv/twirp"
-	"google.golang.org/grpc/metadata"
 )
 
 // PodcastService is the gRPC service for podcast
@@ -137,17 +136,14 @@ func (p *PodcastService) GetUserLastPlayed(ctx context.Context, req *protos.GetU
 }
 
 func getUserIDFromContext(ctx context.Context) (uuid.UUID, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error: metadata not valid")
+	userIDStr := ctx.Value("user_id").(string)
+	if userIDStr == "" {
+		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error: user id not found")
 	}
-	mData := md.Get("user_id")
-	if len(mData) == 0 {
-		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error: no user id")
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error parsing uuid: %e", err)
 	}
-	idString := mData[0]
-	if len(idString) == 0 {
-		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error: id is length of 0")
-	}
-	return uuid.Parse(idString)
+	return userID, nil
 }

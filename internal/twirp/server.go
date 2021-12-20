@@ -3,45 +3,91 @@ package twirp
 import (
 	"context"
 	"crypto/tls"
-	"errors"
-	"fmt"
-	"net"
-	"strings"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/sschwartz96/syncapod-backend/internal/auth"
-	"github.com/sschwartz96/syncapod-backend/internal/protos"
+	protos "github.com/sschwartz96/syncapod-backend/internal/gen"
+	"github.com/twitchtv/twirp"
 	"golang.org/x/crypto/acme/autocert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/reflection"
+)
+
+const (
+	authTokenKey = "Auth_Token"
+	userIDKey    = "User_ID"
 )
 
 // Server is truly needed for its Intercept method which authenticates users before accessing services, but also useful to have all the grpc server boilerplate contained within NewServer function
 type Server struct {
-	server *grpc.Server
-	authC  *auth.AuthController
+	authC    *auth.AuthController
+	services []TwirpService
 }
 
-func NewServer(a *autocert.Manager, aC *auth.AuthController, aS protos.AuthServer, pS protos.PodServer, adminS protos.AdminServer) *Server {
-	var grpcServer *grpc.Server
+type TwirpService struct {
+	name        string
+	twirpServer protos.TwirpServer
+}
+
+func NewServer(a *autocert.Manager, aC *auth.AuthController, aS protos.Auth, pS protos.Pod, adminS protos.Admin) *Server {
 	s := &Server{authC: aC}
-	// setup server
-	gOptCreds := getCredsOpt(a)
-	gOptInter := grpc.UnaryInterceptor(s.Intercept())
-	grpcServer = grpc.NewServer(gOptCreds, gOptInter)
-	s.server = grpcServer
-	// register services
-	reflection.Register(grpcServer)
-	protos.RegisterAuthServer(s.server, aS)
-	protos.RegisterPodServer(s.server, pS)
-	protos.RegisterAdminServer(s.server, adminS)
+	twirpServices := []TwirpService{
+		TwirpService{
+			name: "auth",
+			twirpServer: protos.NewAdminServer(
+				adminS,
+				twirp.WithServerPathPrefix(""),
+				twirp.WithServerHooks(
+					&twirp.ServerHooks{
+						RequestReceived: s.authorizeHook,
+					},
+				),
+			),
+		},
+	}
 	return s
 }
 
-func (s *Server) Start(lis net.Listener) error {
-	return s.server.Serve(lis)
+func (s *Server) authorizeHook(ctx context.Context) (context.Context, error) {
+	//TODO: do I even need to run this hook since the authorizeMiddleware function
+	//      takes care of authorization and inserting the user id into the context
+	return ctx, nil
+}
+
+// authorizeMiddleware authorizes the users rpc request by checking the AUTH_TOKEN header
+// if successful context is updated with basic user information
+func (s *Server) authorizeMiddleware(handler http.Handler) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		authToken := req.Header.Get(authTokenKey)
+		authTokenUUID, err := uuid.Parse(authToken)
+		if err != nil {
+			sendAuthorizedJSON(res)
+			return
+		}
+
+		user, err := s.authC.Authorize(req.Context(), authTokenUUID)
+		if err != nil {
+			sendAuthorizedJSON(res)
+			return
+		}
+		newCtx := context.WithValue(req.Context(), userIDKey, user.ID)
+		handler.ServeHTTP(res, req.WithContext(newCtx))
+	}
+}
+
+func sendAuthorizedJSON(res http.ResponseWriter) {
+	res.WriteHeader(http.StatusUnauthorized)
+	res.Header().Set("Content-Type", "application/json")
+	res.Write([]byte("{\"message\": \"unauthorized\"}"))
+}
+
+func (s *Server) Start() error {
+	mux := http.NewServeMux()
+	for _, service := range s.services {
+		mux.Handle("/rpc/"+service.name, s.authorizeMiddleware(service.twirpServer))
+	}
+	return http.ListenAndServe(":8081", mux)
 }
 
 func getCredsOpt(a *autocert.Manager) grpc.ServerOption {
@@ -54,37 +100,4 @@ func getCredsOpt(a *autocert.Manager) grpc.ServerOption {
 		)
 	}
 	return grpc.EmptyServerOption{}
-}
-
-func (s *Server) Intercept() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-		// if this is going to the Auth service allow through
-		if strings.Contains(info.FullMethod, "protos.Auth") {
-			return handler(ctx, req)
-		}
-
-		md, ok := metadata.FromIncomingContext(ctx)
-		if !ok {
-			return nil, errors.New("invalid metadata")
-		}
-		token := md.Get("token")
-		if len(token) == 0 {
-			return nil, errors.New("no access token sent")
-		}
-
-		uuidTkn, err := uuid.Parse(token[0])
-		if err != nil {
-			return nil, fmt.Errorf("invalid uuid token: %v", err)
-		}
-		user, err := s.authC.Authorize(ctx, uuidTkn)
-		if err != nil {
-			return nil, fmt.Errorf("invalid access token: %v", err)
-		}
-
-		newMD := md.Copy()
-		newMD.Set("user_id", user.ID.String())
-		newCtx := metadata.NewIncomingContext(ctx, newMD)
-
-		return handler(newCtx, req)
-	}
 }
