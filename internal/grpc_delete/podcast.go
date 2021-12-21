@@ -17,7 +17,6 @@ import (
 
 // PodcastService is the gRPC service for podcast
 type PodcastService struct {
-	*protos.UnimplementedPodServer
 	podCon *podcast.PodController
 }
 

@@ -31,21 +31,22 @@ func (a *AuthService) Authenticate(ctx context.Context, req *protos.Authenticate
 	}, nil
 }
 
-func (a *AuthService) Authorize(ctx context.Context, req *protos.AuthorizeReq) (*protos.AuthorizeRes, error) {
-	seshKey, err := uuid.Parse(req.GetSessionKey())
-	if err != nil {
-		return nil, twirp.InvalidArgument.Error("Malformed Session Key")
-	}
-	userRow, err := a.ac.Authorize(ctx, seshKey)
-	if err != nil {
-		return nil, twirp.Unauthenticated.Error("Session Invalid")
-	}
-	return &protos.AuthorizeRes{
-		User: convertUserFromDB(userRow),
-	}, nil
-}
+// Authorize TODO: find use case
+// func (a *AuthService) Authorize(ctx context.Context, req *protos.AuthorizeReq) (*protos.AuthorizeRes, error) {
+// 	seshKey, err := uuid.Parse(req.GetSessionKey())
+// 	if err != nil {
+// 		return nil, twirp.InvalidArgument.Error("Malformed Session Key")
+// 	}
+// 	userRow, err := a.ac.Authorize(ctx, seshKey)
+// 	if err != nil {
+// 		return nil, twirp.Unauthenticated.Error("Session Invalid")
+// 	}
+// 	return &protos.AuthorizeRes{
+// 		User: convertUserFromDB(userRow),
+// 	}, nil
+// }
 
-// Logout removes the given session key
+// Logout removes the given session key from the db, in effect "logging out" of the user's session
 func (a *AuthService) Logout(ctx context.Context, req *protos.LogoutReq) (*protos.LogoutRes, error) {
 	seshKey, err := uuid.Parse(req.GetSessionKey())
 	if err != nil {
