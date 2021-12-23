@@ -39,12 +39,8 @@ func NewServer(a *autocert.Manager, aC *auth.AuthController, aS protos.Auth, pS 
 			twirpServer: protos.NewAdminServer(
 				adminS,
 				twirp.WithServerPathPrefix("/rpc/admin"),
-				twirp.WithServerInterceptors(s.authIntercept()),
-				// twirp.WithServerHooks(
-				// &twirp.ServerHooks{
-				// 	RequestReceived: s.authorizeHook,
-				// },
-				// ),
+				// twirp.WithServerInterceptors(s.authIntercept()),
+				twirp.WithServerHooks(s.authorizeHook()),
 			),
 		},
 		{
@@ -52,12 +48,8 @@ func NewServer(a *autocert.Manager, aC *auth.AuthController, aS protos.Auth, pS 
 			twirpServer: protos.NewAuthServer(
 				aS,
 				twirp.WithServerPathPrefix("/rpc/auth"),
-				twirp.WithServerInterceptors(s.authIntercept()),
-				// twirp.WithServerHooks(
-				// 	&twirp.ServerHooks{
-				// 		RequestReceived: s.authorizeHook,
-				// 	},
-				// ),
+				// twirp.WithServerInterceptors(s.authIntercept()),
+				twirp.WithServerHooks(s.authorizeHook()),
 			),
 		},
 		{
@@ -65,12 +57,8 @@ func NewServer(a *autocert.Manager, aC *auth.AuthController, aS protos.Auth, pS 
 			twirpServer: protos.NewPodServer(
 				pS,
 				twirp.WithServerPathPrefix("/rpc/podcast"),
-				twirp.WithServerInterceptors(s.authIntercept()),
-				// twirp.WithServerHooks(
-				// 	&twirp.ServerHooks{
-				// 		RequestReceived: s.authorizeHook,
-				// 	},
-				// ),
+				// twirp.WithServerInterceptors(s.authIntercept()),
+				twirp.WithServerHooks(s.authorizeHook()),
 			),
 		},
 	}
@@ -79,83 +67,97 @@ func NewServer(a *autocert.Manager, aC *auth.AuthController, aS protos.Auth, pS 
 }
 
 // could use this instead of hooks?
-func (s *Server) authIntercept() twirp.Interceptor {
-	return func(next twirp.Method) twirp.Method {
-		return func(ctx context.Context, req interface{}) (interface{}, error) {
-			// get the method name
-			methodName, ok := twirp.MethodName(ctx)
-			if !ok {
-				return nil, twirp.NotFound.Error("Auth Intercept, Method Not Found")
-			}
-			// if Authenticate method then allow the method to proceed
-			if methodName == "Authenticate" {
-				return next(ctx, req)
-			}
+// func (s *Server) authIntercept() twirp.Interceptor {
+// 	return func(next twirp.Method) twirp.Method {
+// 		return func(ctx context.Context, req interface{}) (interface{}, error) {
+// 			// get the method name
+// 			methodName, ok := twirp.MethodName(ctx)
+// 			if !ok {
+// 				return nil, twirp.NotFound.Error("Auth Intercept, Method Not Found")
+// 			}
+// 			// if Authenticate method then allow the method to proceed
+// 			if methodName == "Authenticate" {
+// 				return next(ctx, req)
+// 			}
 
-			// check for header and auth token
-			header, ok := twirp.HTTPRequestHeaders(ctx)
-			if !ok {
-				return nil, twirp.NotFound.Error("Auth Intercept, HTTP Header Not Present")
-			}
+// 			// check for header and auth token
+// 			header, ok := twirp.HTTPRequestHeaders(ctx)
+// 			if !ok {
+// 				return nil, twirp.NotFound.Error("Auth Intercept, HTTP Header Not Present")
+// 			}
 
-			authTokenString := header.Get(authTokenKey)
-			authToken, err := uuid.Parse(authTokenString)
-			if err != nil {
-				return ctx, twirp.Unauthenticated.Error("")
-			}
-			user, err := s.authC.Authorize(ctx, authToken)
-			if err != nil {
-				return ctx, twirp.Unauthenticated.Error("")
-			}
-			ctx = context.WithValue(ctx, twirpContextKey{}, twirpContextValue{
-				authToken: authToken,
-				user:      user,
-			})
-			return next(ctx, req)
+// 			authTokenString := header.Get(authTokenKey)
+// 			authToken, err := uuid.Parse(authTokenString)
+// 			if err != nil {
+// 				return ctx, twirp.Unauthenticated.Error("")
+// 			}
+// 			user, err := s.authC.Authorize(ctx, authToken)
+// 			if err != nil {
+// 				return ctx, twirp.Unauthenticated.Error("")
+// 			}
+// 			ctx = context.WithValue(ctx, twirpContextKey{}, twirpContextValue{
+// 				authToken: authToken,
+// 				user:      user,
+// 			})
+// 			return next(ctx, req)
+// 		}
+// 	}
+// }
+
+func (s *Server) authorizeHook() *twirp.ServerHooks {
+	hooks := &twirp.ServerHooks{}
+	hooks.RequestRouted = func(ctx context.Context) (context.Context, error) {
+		// get the method name
+		methodName, ok := twirp.MethodName(ctx)
+		if !ok {
+			return ctx, twirp.NotFound.Error("Auth Hook, Method Not Found")
 		}
+		// if Authenticate method then allow the method to proceed
+		if methodName == "Authenticate" {
+			return ctx, nil
+		}
+
+		// extract auth token from context
+		authTokenString, ok := ctx.Value(twirpHeaderKey{}).(string)
+		if !ok {
+			return ctx, twirp.NotFound.Error("Auth Hook, Could Not Convert Auth Token to String")
+		}
+
+		authToken, err := uuid.Parse(authTokenString)
+		if err != nil {
+			return ctx, twirp.Unauthenticated.Error("Auth Hook, Could Not Parse Auth Token -> UUID ")
+		}
+
+		user, err := s.authC.Authorize(ctx, authToken)
+		if err != nil {
+			return ctx, twirp.Unauthenticated.Error("")
+		}
+		ctx = context.WithValue(ctx, twirpHeaderKey{}, twirpCtxData{
+			authToken: authToken,
+			user:      user,
+		})
+		return ctx, nil
+
+	}
+	return hooks
+}
+
+// withAuthTokenMiddleware extracts the Auth_Token from header and inserts it into context
+func withAuthTokenMiddleware(next http.Handler) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		// get the auth token from http header
+		authToken := req.Header.Get(authTokenKey)
+
+		newCtx := context.WithValue(req.Context(), twirpHeaderKey{}, authToken)
+
+		// call original hander's ServeHTTP function
+		next.ServeHTTP(res, req.WithContext(newCtx))
 	}
 }
 
-// func (s *Server) authorizeHook(ctx context.Context) (context.Context, error) {
-// 	authTokenInterface := ctx.Value(twirpContextKey{})
-// 	if authTokenInterface == nil {
-// 		return ctx, twirp.Unauthenticated.Error("")
-// 	}
-// 	authTokenString, ok := authTokenInterface.(string)
-// 	if !ok {
-// 		return ctx, twirp.Unauthenticated.Error("")
-// 	}
-// 	authToken, err := uuid.Parse(authTokenString)
-// 	if err != nil {
-// 		return ctx, twirp.Unauthenticated.Error("")
-// 	}
-// 	user, err := s.authC.Authorize(ctx, authToken)
-// 	if err != nil {
-// 		return ctx, twirp.Unauthenticated.Error("")
-// 	}
-// 	ctx = context.WithValue(ctx, twirpContextKey{}, twirpContextValue{
-// 		authToken: authToken,
-// 		user:      user,
-// 	})
-// 	return ctx, nil
-// }
+type twirpHeaderKey struct{}
 
-// // authorizeMiddleware authorizes the users rpc request by checking the AuthToken header
-// // if successful context is updated with basic user information
-// func (s *Server) authorizeMiddleware(handler http.Handler) http.HandlerFunc {
-// 	return func(res http.ResponseWriter, req *http.Request) {
-// 		// get the auth token from http header
-// 		authToken := req.Header.Get(authTokenKey)
-// 		// create new req context with auth token value
-// 		newCtx := context.WithValue(req.Context(), twirpContextKey{}, authToken)
-// 		// call original hander's ServeHTTP function
-// 		handler.ServeHTTP(res, req.WithContext(newCtx))
-// 	}
-// }
-
-type twirpContextKey struct{}
-
-type twirpContextValue struct {
+type twirpCtxData struct {
 	authToken uuid.UUID
 	user      *db.UserRow
 }
@@ -163,8 +165,8 @@ type twirpContextValue struct {
 func (s *Server) Start() error {
 	mux := http.NewServeMux()
 	for _, service := range s.services {
-		// mux.Handle(service.twirpServer.PathPrefix(), s.authorizeMiddleware(service.twirpServer))
-		mux.Handle(service.twirpServer.PathPrefix(), service.twirpServer)
+		mux.Handle(service.twirpServer.PathPrefix(), withAuthTokenMiddleware(service.twirpServer))
+		// mux.Handle(service.twirpServer.PathPrefix(), service.twirpServer)
 	}
 	return http.ListenAndServe(":8081", mux)
 }

@@ -42,7 +42,7 @@ func Test_AdminGRPC(t *testing.T) {
 		t.Fatalf("Twirp could not add add headers: %v", err)
 	}
 
-	client := protos.NewAdminProtobufClient("http://localhost:8081", http.DefaultClient, twirp.WithClientPathPrefix("/rpc/admin"))
+	client := protos.NewAdminJSONClient("http://localhost:8081", http.DefaultClient, twirp.WithClientPathPrefix("/rpc/admin"))
 
 	// AddPodcast
 	addPodRes, err := client.AddPodcast(ctx, &protos.AddPodReq{Url: goTimeRSSURL})

@@ -136,14 +136,10 @@ func (p *PodcastService) GetUserLastPlayed(ctx context.Context, req *protos.GetU
 }
 
 func getUserIDFromContext(ctx context.Context) (uuid.UUID, error) {
-	userIDStr := ctx.Value("user_id").(string)
-	if userIDStr == "" {
-		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error: user id not found")
+	userData, ok := ctx.Value(twirpHeaderKey{}).(twirpCtxData)
+	if !ok {
+		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error could not extract data from context")
 	}
 
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("getUserIDFromContext() error parsing uuid: %e", err)
-	}
-	return userID, nil
+	return userData.user.ID, nil
 }

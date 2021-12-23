@@ -75,7 +75,7 @@ func Test_PodcastGRPC(t *testing.T) {
 	// GetPodcast
 	pod, err := client.GetPodcast(ctx, &protos.GetPodReq{Id: testPod.ID.String()})
 	if err != nil {
-		log.Panicln("error: ", err)
+		t.Fatalf("error: %v", err)
 	}
 	require.Equal(t, nil, err)
 	require.NotNil(t, pod)
