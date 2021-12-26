@@ -24,10 +24,10 @@ clean:
 	go clean -testcache
 
 test:
-	go test ./...
+	go test ./internal/...
 
 testv:
-	go test ./... -v
+	go test ./internal/... -v
 
 coverage:
 	go test ./... -cover
@@ -37,6 +37,9 @@ deploy:
 	rsync -a ./templates ./migrations ./docker-compose.yml ./LICENSE ./syncapod \
 		root@syncapod.com:/root/syncapod
 	rm ./syncapod
+
+sync:
+	rsync -a --exclude config.json --exclude .env . root@syncapod.com:/root/syncapod
 
 protos:
 	protoc -I $(PROTO_DIR) \

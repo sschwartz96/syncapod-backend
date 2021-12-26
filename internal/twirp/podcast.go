@@ -46,6 +46,9 @@ func (p *PodcastService) GetEpisodes(ctx context.Context, req *protos.GetEpiReq)
 	if err != nil {
 		return nil, twirp.InvalidArgument.Error("Could not parse podcast UUID")
 	}
+	if req.End == 0 {
+		req.End = 10
+	}
 	dbEpis, err := p.podCon.FindEpisodesByRange(ctx, podID, req.Start, req.End)
 	if err != nil {
 		return nil, twirp.Internal.Errorf("Could not find episodes by range: %w", err)
