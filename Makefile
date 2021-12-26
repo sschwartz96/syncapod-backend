@@ -32,12 +32,6 @@ testv:
 coverage:
 	go test ./... -cover
 
-deploy:
-	CGO_ENABLED=0 go build -o syncapod ./cmd/main.go 
-	rsync -a ./templates ./migrations ./docker-compose.yml ./LICENSE ./syncapod \
-		root@syncapod.com:/root/syncapod
-	rm ./syncapod
-
 sync:
 	rsync -a --exclude config.json --exclude .env . root@syncapod.com:/root/syncapod
 
